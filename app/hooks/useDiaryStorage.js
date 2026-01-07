@@ -1,6 +1,6 @@
 // app/hooks/useDiaryStorage.js
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
@@ -122,24 +122,14 @@ export const useDiaryItems = (sectionName) => {
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load items whenever the section changes
-  useEffect(() => {
-    if (sectionName) {
-      loadItems();
-    }
-  }, [sectionName]);
-
-  /**
-   * Load items for the current section from AsyncStorage
-   */
-  const loadItems = async () => {
+  const loadItems = useCallback(async () => {
     try {
       // Create a unique key for this section's items
       const itemsKey = STORAGE_KEYS.ITEMS + sectionName;
-      
+
       // Get stored items
       const storedItems = await AsyncStorage.getItem(itemsKey);
-      
+
       // If items exist, parse and set state
       if (storedItems !== null) {
         setItems(JSON.parse(storedItems));
@@ -153,7 +143,14 @@ export const useDiaryItems = (sectionName) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [sectionName]);
+
+  // Load items whenever the section changes
+  useEffect(() => {
+    if (sectionName) {
+      loadItems();
+    }
+  }, [sectionName, loadItems]);
 
   /**
    * Save items to AsyncStorage
