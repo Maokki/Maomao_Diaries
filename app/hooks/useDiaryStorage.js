@@ -130,16 +130,11 @@ const getBackupInfo = async () => {
 
 /**
  * Hook for managing diary sections (sidebar)
- * Returns: [sections, addSection, deleteSection, isLoading]
+ * Returns: [sections, addSection, deleteSection, renameSection, reloadSections, isLoading]
  */
 export const useDiarySections = () => {
   const [sections, setSections] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Load sections from storage when component mounts
-  useEffect(() => {
-    loadSections();
-  }, []);
 
   /**
    * Load sections from AsyncStorage
@@ -153,14 +148,30 @@ export const useDiarySections = () => {
       // If sections exist, parse the JSON string and set state
       if (storedSections !== null) {
         setSections(JSON.parse(storedSections));
+      } else {
+        setSections([]); // Set empty array if no sections
       }
     } catch (error) {
       // Log error if something goes wrong
       console.error('Error loading sections:', error);
+      setSections([]);
     } finally {
       // Set loading to false whether success or error
       setIsLoading(false);
     }
+  };
+
+  // Load sections from storage when component mounts
+  useEffect(() => {
+    loadSections();
+  }, []);
+
+  /**
+   * Reload sections manually
+   * Useful for forcing a refresh after operations
+   */
+  const reloadSections = async () => {
+    await loadSections();
   };
 
   /**
@@ -172,22 +183,22 @@ export const useDiarySections = () => {
       // Create new sections array with the new section at the top
       const newSections = [sectionName, ...sections];
 
-      // Update state immediately for better UX
-      setSections(newSections);
-
-      // Save to AsyncStorage (converts array to JSON string)
+      // Save to AsyncStorage first (converts array to JSON string)
       await AsyncStorage.setItem(
         STORAGE_KEYS.SECTIONS,
         JSON.stringify(newSections)
       );
 
       // Create a backup copy for recovery (this happens after main save)
-      // If something goes wrong later, we can restore from this backup
       await createBackup(STORAGE_KEYS.BACKUP_SECTIONS, newSections);
+
+      // Update state AFTER successful save - this triggers immediate UI update
+      setSections(newSections);
+
+      return true;
     } catch (error) {
       console.error('Error adding section:', error);
-      // Revert state if save failed
-      setSections(sections);
+      throw error;
     }
   };
 
@@ -200,10 +211,7 @@ export const useDiarySections = () => {
       // Remove section from array
       const newSections = sections.filter(section => section !== sectionName);
 
-      // Update state
-      setSections(newSections);
-
-      // Save updated sections list
+      // Save updated sections list to AsyncStorage
       await AsyncStorage.setItem(
         STORAGE_KEYS.SECTIONS,
         JSON.stringify(newSections)
@@ -212,11 +220,79 @@ export const useDiarySections = () => {
       // Backup the new state after deletion
       await createBackup(STORAGE_KEYS.BACKUP_SECTIONS, newSections);
 
-      // Also delete all items associated with this section
+      // Delete all items associated with this section
       const itemsKey = STORAGE_KEYS.ITEMS + sectionName;
       await AsyncStorage.removeItem(itemsKey);
+
+      // Delete the backup items too
+      const backupItemsKey = STORAGE_KEYS.BACKUP_ITEMS + sectionName;
+      await AsyncStorage.removeItem(backupItemsKey);
+
+      // Update state AFTER successful operations - triggers immediate UI update
+      setSections(newSections);
+
+      return true;
     } catch (error) {
       console.error('Error deleting section:', error);
+      throw error;
+    }
+  };
+
+  /**
+   * Rename a section
+   * @param {string} oldName - Current section name
+   * @param {string} newName - New section name
+   */
+  const renameSection = async (oldName, newName) => {
+    try {
+      // Check if new name already exists
+      if (sections.includes(newName)) {
+        throw new Error('Section name already exists');
+      }
+
+      // Step 1: Update the sections array - replace old name with new name
+      const updatedSections = sections.map(section => 
+        section === oldName ? newName : section
+      );
+
+      // Step 2: Save the updated sections list to AsyncStorage
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.SECTIONS,
+        JSON.stringify(updatedSections)
+      );
+
+      // Step 3: Move items from old section key to new section key
+      const oldItemsKey = STORAGE_KEYS.ITEMS + oldName;
+      const newItemsKey = STORAGE_KEYS.ITEMS + newName;
+      
+      const storedItems = await AsyncStorage.getItem(oldItemsKey);
+      
+      if (storedItems !== null) {
+        // Copy items to new key
+        await AsyncStorage.setItem(newItemsKey, storedItems);
+        
+        // Create backup for new items
+        const backupKey = STORAGE_KEYS.BACKUP_ITEMS + newName;
+        await createBackup(backupKey, JSON.parse(storedItems));
+      }
+
+      // Step 4: Delete old items key
+      await AsyncStorage.removeItem(oldItemsKey);
+      
+      // Step 5: Delete old backup
+      const oldBackupKey = STORAGE_KEYS.BACKUP_ITEMS + oldName;
+      await AsyncStorage.removeItem(oldBackupKey);
+
+      // Step 6: Create backup of updated sections
+      await createBackup(STORAGE_KEYS.BACKUP_SECTIONS, updatedSections);
+
+      // Step 7: Update state AFTER all operations - triggers immediate UI update
+      setSections(updatedSections);
+
+      return true;
+    } catch (error) {
+      console.error('Error renaming section:', error);
+      throw error;
     }
   };
 
@@ -224,6 +300,8 @@ export const useDiarySections = () => {
     sections,
     addSection,
     deleteSection,
+    renameSection,
+    reloadSections, 
     isLoading
   };
 };
@@ -396,32 +474,5 @@ export const useDiaryItems = (sectionName) => {
     isLoading
   };
 };
-
-/**
- * STORAGE STRUCTURE EXPLANATION:
- *
- * AsyncStorage stores data as key-value pairs (like a dictionary)
- *
- * Example of how data is stored:
- *
- * MAIN DATA:
- * '@diary_sections' → '["Work", "Personal", "Travel"]'
- * '@diary_items_Work' → '[{id: 1, text: "Meeting notes", ...}, {id: 2, text: "Todo", ...}]'
- * '@diary_items_Personal' → '[{id: 3, text: "Journal entry", ...}]'
- *
- * BACKUP DATA (automatically created):
- * '@backup_diary_sections' → '{data: ["Work", "Personal", "Travel"], timestamp: "2026-01-07T...", version: 1}'
- * '@backup_diary_items_Work' → '{data: [{id: 1, ...}], timestamp: "2026-01-07T...", version: 1}'
- *
- * METADATA:
- * '@backup_metadata' → '{lastBackup: "2026-01-07T...", backupKey: "...", status: "success"}'
- *
- * Why this structure?
- * - Main data is simple and fast to access
- * - Backup data includes timestamp and version for recovery purposes
- * - Metadata helps track backup status
- * - Separate keys prevent main data from overwriting backups
- * - When you delete a section, backup can be used to recover accidentally deleted data
- */
 
 export { createBackup, restoreFromBackup, getBackupInfo, STORAGE_KEYS };

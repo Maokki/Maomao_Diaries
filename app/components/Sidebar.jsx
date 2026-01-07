@@ -1,9 +1,21 @@
 // app/components/Sidebar.jsx
-import { StyleSheet, Text, View, TouchableOpacity, Animated, Dimensions, TextInput, Pressable, ActivityIndicator } from 'react-native';
-import React, { useRef, useState, useEffect } from 'react';
+import { 
+  StyleSheet, 
+  Text, 
+  View, 
+  TouchableOpacity, 
+  Animated, 
+  Dimensions, 
+  TextInput, 
+  Pressable, 
+  ActivityIndicator,
+  Modal,
+  Alert
+} from 'react-native';
+import React, { useRef, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
-import { useDiarySections } from '../hooks/useDiaryStorage'; // import custom hook
+import { useDiarySections } from '../hooks/useDiaryStorage';
 
 const { width } = Dimensions.get('window');
 const SIDEBAR_WIDTH = width * 0.7;
@@ -12,9 +24,16 @@ const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [sectionText, setSectionText] = useState('');
   
-  // Use our custom hook to manage sections
-  // This replaces the old useState([]) for sections
-  const { sections, addSection, deleteSection, isLoading } = useDiarySections();
+  // State for the context menu (rename/delete popup)
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [isContextMenuVisible, setIsContextMenuVisible] = useState(false);
+  
+  // State for rename modal
+  const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
+  const [renameText, setRenameText] = useState('');
+  
+  // Get the hook functions - now includes reloadSections
+  const { sections, addSection, deleteSection, renameSection, reloadSections, isLoading } = useDiarySections();
   
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
 
@@ -30,12 +49,114 @@ const Sidebar = () => {
     setIsOpen(!isOpen);
   };
 
-  // Updated to use the hook's addSection function
+  /**
+   * Add a new section
+   * State updates automatically after addSection completes
+   */
   const handleAddSection = async () => {
     if (sectionText.trim()) {
-      await addSection(sectionText); // This now saves to AsyncStorage
-      setSectionText('');
+      try {
+        await addSection(sectionText);
+        setSectionText(''); // Clear input after successful add
+        // No need to manually refresh - the hook updates state automatically
+      } catch (error) {
+        console.error('Error adding section:', error);
+        Alert.alert('Error', 'Failed to add section. Please try again.');
+      }
     }
+  };
+
+  /**
+   * Open context menu when 3-dot button is pressed
+   */
+  const openContextMenu = (section, e) => {
+    e.stopPropagation();
+    setSelectedSection(section);
+    setIsContextMenuVisible(true);
+  };
+
+  /**
+   * Close the context menu
+   */
+  const closeContextMenu = () => {
+    setIsContextMenuVisible(false);
+    setSelectedSection(null);
+  };
+
+  /**
+   * Open the rename modal
+   */
+  const openRenameModal = () => {
+    setRenameText(selectedSection);
+    setIsContextMenuVisible(false);
+    setIsRenameModalVisible(true);
+  };
+
+  /**
+   * Rename the selected section
+   * State updates automatically after renameSection completes
+   */
+  const handleRename = async () => {
+    if (renameText.trim() && renameText !== selectedSection) {
+      try {
+        await renameSection(selectedSection, renameText);
+        
+        // Close modal and reset
+        setIsRenameModalVisible(false);
+        setRenameText('');
+        setSelectedSection(null);
+        
+        // No need to manually refresh - the hook updates state automatically
+        Alert.alert('Success', `Section renamed to "${renameText}"`);
+      } catch (error) {
+        console.error('Error renaming section:', error);
+        
+        if (error.message === 'Section name already exists') {
+          Alert.alert('Error', 'A section with this name already exists!');
+        } else {
+          Alert.alert('Error', 'Failed to rename section. Please try again.');
+        }
+      }
+    } else if (renameText.trim() === '') {
+      Alert.alert('Error', 'Section name cannot be empty!');
+    }
+  };
+
+  /**
+   * Delete the selected section with confirmation
+   * State updates automatically after deleteSection completes
+   */
+  const handleDelete = () => {
+    setIsContextMenuVisible(false);
+    
+    Alert.alert(
+      'Delete Section',
+      `Are you sure you want to delete "${selectedSection}"? All items in this section will also be deleted.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => setSelectedSection(null)
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const sectionToDelete = selectedSection;
+              await deleteSection(selectedSection);
+              setSelectedSection(null);
+              
+              // No need to manually refresh - the hook updates state automatically
+              Alert.alert('Deleted', `Section "${sectionToDelete}" has been deleted.`);
+            } catch (error) {
+              console.error('Error deleting section:', error);
+              Alert.alert('Error', 'Failed to delete section. Please try again.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -79,35 +200,132 @@ const Sidebar = () => {
           </Pressable>
         </View>
 
-        {/* Show loading indicator while data is loading */}
         {isLoading ? (
           <ActivityIndicator size="large" color="#509107ff" />
         ) : (
-          // Map through sections loaded from AsyncStorage
           sections.map((section, index) => (
-            <Link
-              key={index}
-              href={`/diary/${encodeURIComponent(section)}`}
-              asChild
-            >
-              <Pressable 
-                style={styles.menuItem}
-                onPress={toggleSidebar}
+            <View key={index} style={styles.menuItemWrapper}>
+              <Link
+                href={`/diary/${encodeURIComponent(section)}`}
+                asChild
+                style={styles.linkWrapper}
               >
-                <Text style={styles.menuText}>{section}</Text>
-                <Ionicons name="chevron-forward" size={20} color="#999" />
-              </Pressable>
-            </Link>
+                <Pressable 
+                  style={styles.menuItem}
+                  onPress={toggleSidebar}
+                >
+                  <Text style={styles.menuText}>{section}</Text>
+                  <Ionicons name="chevron-forward" size={20} color="#999" />
+                </Pressable>
+              </Link>
+
+              <TouchableOpacity
+                style={styles.menuButton}
+                onPress={(e) => openContextMenu(section, e)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="ellipsis-horizontal" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
           ))
         )}
 
       </Animated.View>
+
+      {/* Context Menu Modal */}
+      <Modal
+        visible={isContextMenuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeContextMenu}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={closeContextMenu}
+        >
+          <View style={styles.contextMenu}>
+            <Text style={styles.contextMenuTitle}>
+              {selectedSection}
+            </Text>
+            
+            <TouchableOpacity 
+              style={styles.contextMenuItem}
+              onPress={openRenameModal}
+            >
+              <Ionicons name="create-outline" size={24} color="#509107ff" />
+              <Text style={styles.contextMenuText}>Rename</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.contextMenuItem}
+              onPress={handleDelete}
+            >
+              <Ionicons name="trash-outline" size={24} color="#ff3b30" />
+              <Text style={[styles.contextMenuText, styles.deleteText]}>Delete</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.contextMenuItem, styles.cancelButton]}
+              onPress={closeContextMenu}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Rename Modal */}
+      <Modal
+        visible={isRenameModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsRenameModalVisible(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => setIsRenameModalVisible(false)}
+        >
+          <Pressable style={styles.renameModal}>
+            <Text style={styles.renameTitle}>Rename Section</Text>
+            
+            <TextInput
+              style={styles.renameInput}
+              value={renameText}
+              onChangeText={setRenameText}
+              placeholder="Enter new name..."
+              placeholderTextColor="#999"
+              autoFocus
+              onSubmitEditing={handleRename}
+            />
+
+            <View style={styles.renameButtons}>
+              <TouchableOpacity 
+                style={[styles.renameButton, styles.renameCancelButton]}
+                onPress={() => {
+                  setIsRenameModalVisible(false);
+                  setRenameText('');
+                }}
+              >
+                <Text style={styles.renameCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.renameButton, styles.renameSaveButton]}
+                onPress={handleRename}
+              >
+                <Text style={styles.renameSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
 
 export default Sidebar;
 
+// Styles remain the same...
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
@@ -175,16 +393,138 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     color: '#333',
   },
+  menuItemWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  linkWrapper: {
+    flex: 1,
+  },
   menuItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    paddingRight: 10,
   },
   menuText: {
     fontSize: 16,
     color: '#333',
+    flex: 1,
+  },
+  menuButton: {
+    padding: 10,
+    paddingRight: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contextMenu: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  contextMenuTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#333',
+  },
+  contextMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    backgroundColor: '#f8f8f8',
+  },
+  contextMenuText: {
+    fontSize: 16,
+    marginLeft: 15,
+    color: '#333',
+  },
+  deleteText: {
+    color: '#ff3b30',
+  },
+  cancelButton: {
+    backgroundColor: '#e0e0e0',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    textAlign: 'center',
+    flex: 1,
+  },
+  renameModal: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  renameTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#333',
+  },
+  renameInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f8f8f8',
+    marginBottom: 20,
+  },
+  renameButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  renameButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  renameCancelButton: {
+    backgroundColor: '#e0e0e0',
+  },
+  renameCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  renameSaveButton: {
+    backgroundColor: '#509107ff',
+  },
+  renameSaveText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
