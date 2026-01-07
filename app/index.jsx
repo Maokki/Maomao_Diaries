@@ -1,12 +1,14 @@
 // app/index.jsx
 import { StyleSheet, View, Text } from 'react-native';
 import Sidebar from './components/Sidebar';
+import BackupButton from './components/BackupButton';
 
 export default function Home() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Maomao Diaries</Text>
       <Sidebar />
+      <BackupButton />
     </View>
   );
 }
