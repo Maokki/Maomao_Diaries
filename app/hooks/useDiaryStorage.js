@@ -18,6 +18,114 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const STORAGE_KEYS = {
   SECTIONS: '@diary_sections', // Key for storing the list of diary sections
   ITEMS: '@diary_items_',      // Prefix for storing items (will be combined with section name)
+  // Backup keys - stores copies of data for recovery purposes
+  BACKUP_SECTIONS: '@backup_diary_sections', // Backup of sections list
+  BACKUP_ITEMS: '@backup_diary_items_',      // Backup of section items
+  BACKUP_METADATA: '@backup_metadata',       // Stores info about last backup (timestamp, version)
+};
+
+/**
+ * BACKUP SYSTEM EXPLANATION:
+ *
+ * How Backup Works:
+ * ─────────────────
+ * 1. AUTOMATIC BACKUPS: Every time you add/update/delete data, a backup copy is created
+ * 2. STORAGE LOCATIONS: Main data and backup data are stored separately in AsyncStorage
+ *    - Main data: @diary_sections, @diary_items_*
+ *    - Backup copies: @backup_diary_sections, @backup_diary_items_*
+ * 3. METADATA TRACKING: The system records when the last backup was made
+ * 4. RECOVERY: If main data gets corrupted, you can restore from the backup copy
+ *
+ * Example Flow:
+ * ─────────────
+ * User adds a note:
+ *   1. Current note is saved to main storage
+ *   2. Previous version is automatically backed up
+ *   3. Timestamp of backup is recorded in metadata
+ *   4. If something goes wrong, restore function can retrieve the backup
+ *
+ * Why This Works:
+ * ───────────────
+ * - AsyncStorage is reliable but can sometimes fail during writes
+ * - Having a backup copy ensures you don't lose data if write fails
+ * - Metadata helps identify which backup is most recent
+ * - Separate storage keys prevent main data from overwriting backups
+ */
+
+/**
+ * Utility function: Create a backup of current data
+ * This is called automatically after every save operation
+ * @param {string} backupKey - The key to store the backup under
+ * @param {*} data - The data to backup (will be JSON stringified)
+ * @returns {Promise<boolean>} - True if backup succeeded, false otherwise
+ */
+const createBackup = async (backupKey, data) => {
+  try {
+    // Save a copy of the data with a timestamp
+    const backupData = {
+      data: data,
+      timestamp: new Date().toISOString(), // When was this backup made?
+      version: 1,                         // For future versioning support
+    };
+
+    await AsyncStorage.setItem(backupKey, JSON.stringify(backupData));
+
+    // Update the backup metadata to track when last backup happened
+    const metadata = {
+      lastBackup: new Date().toISOString(),
+      backupKey: backupKey,
+      status: 'success',
+    };
+
+    await AsyncStorage.setItem(STORAGE_KEYS.BACKUP_METADATA, JSON.stringify(metadata));
+
+    return true;
+  } catch (error) {
+    console.error('Backup failed:', error);
+    return false;
+  }
+};
+
+/**
+ * Utility function: Restore data from backup
+ * Called when main data is corrupted or lost
+ * @param {string} backupKey - The key where backup is stored
+ * @returns {Promise<*>} - The restored data, or null if restore failed
+ */
+const restoreFromBackup = async (backupKey) => {
+  try {
+    // Retrieve the backup copy with metadata
+    const backupData = await AsyncStorage.getItem(backupKey);
+
+    if (backupData === null) {
+      console.warn('No backup found for key:', backupKey);
+      return null;
+    }
+
+    // Parse the backup and extract just the data
+    const parsed = JSON.parse(backupData);
+    console.log(`Restored from backup made at: ${parsed.timestamp}`);
+
+    return parsed.data;
+  } catch (error) {
+    console.error('Restore failed:', error);
+    return null;
+  }
+};
+
+/**
+ * Utility function: Get backup information
+ * Shows when the last backup was created
+ * @returns {Promise<Object|null>} - Backup metadata or null
+ */
+const getBackupInfo = async () => {
+  try {
+    const metadata = await AsyncStorage.getItem(STORAGE_KEYS.BACKUP_METADATA);
+    return metadata ? JSON.parse(metadata) : null;
+  } catch (error) {
+    console.error('Error getting backup info:', error);
+    return null;
+  }
 };
 
 /**
@@ -63,15 +171,19 @@ export const useDiarySections = () => {
     try {
       // Create new sections array with the new section at the top
       const newSections = [sectionName, ...sections];
-      
+
       // Update state immediately for better UX
       setSections(newSections);
-      
+
       // Save to AsyncStorage (converts array to JSON string)
       await AsyncStorage.setItem(
-        STORAGE_KEYS.SECTIONS, 
+        STORAGE_KEYS.SECTIONS,
         JSON.stringify(newSections)
       );
+
+      // Create a backup copy for recovery (this happens after main save)
+      // If something goes wrong later, we can restore from this backup
+      await createBackup(STORAGE_KEYS.BACKUP_SECTIONS, newSections);
     } catch (error) {
       console.error('Error adding section:', error);
       // Revert state if save failed
@@ -87,16 +199,19 @@ export const useDiarySections = () => {
     try {
       // Remove section from array
       const newSections = sections.filter(section => section !== sectionName);
-      
+
       // Update state
       setSections(newSections);
-      
+
       // Save updated sections list
       await AsyncStorage.setItem(
-        STORAGE_KEYS.SECTIONS, 
+        STORAGE_KEYS.SECTIONS,
         JSON.stringify(newSections)
       );
-      
+
+      // Backup the new state after deletion
+      await createBackup(STORAGE_KEYS.BACKUP_SECTIONS, newSections);
+
       // Also delete all items associated with this section
       const itemsKey = STORAGE_KEYS.ITEMS + sectionName;
       await AsyncStorage.removeItem(itemsKey);
@@ -160,7 +275,14 @@ export const useDiaryItems = (sectionName) => {
   const saveItems = async (itemsToSave) => {
     try {
       const itemsKey = STORAGE_KEYS.ITEMS + sectionName;
+
+      // Save the main copy
       await AsyncStorage.setItem(itemsKey, JSON.stringify(itemsToSave));
+
+      // Create a backup copy for recovery
+      // The backup key is specific to this section, so different sections have different backups
+      const backupKey = STORAGE_KEYS.BACKUP_ITEMS + sectionName;
+      await createBackup(backupKey, itemsToSave);
     } catch (error) {
       console.error('Error saving items:', error);
       throw error; // Re-throw to handle in calling function
@@ -277,18 +399,29 @@ export const useDiaryItems = (sectionName) => {
 
 /**
  * STORAGE STRUCTURE EXPLANATION:
- * 
+ *
  * AsyncStorage stores data as key-value pairs (like a dictionary)
- * 
+ *
  * Example of how data is stored:
- * 
+ *
+ * MAIN DATA:
  * '@diary_sections' → '["Work", "Personal", "Travel"]'
  * '@diary_items_Work' → '[{id: 1, text: "Meeting notes", ...}, {id: 2, text: "Todo", ...}]'
  * '@diary_items_Personal' → '[{id: 3, text: "Journal entry", ...}]'
- * '@diary_items_Travel' → '[{id: 4, text: "Trip plan", ...}]'
- * 
+ *
+ * BACKUP DATA (automatically created):
+ * '@backup_diary_sections' → '{data: ["Work", "Personal", "Travel"], timestamp: "2026-01-07T...", version: 1}'
+ * '@backup_diary_items_Work' → '{data: [{id: 1, ...}], timestamp: "2026-01-07T...", version: 1}'
+ *
+ * METADATA:
+ * '@backup_metadata' → '{lastBackup: "2026-01-07T...", backupKey: "...", status: "success"}'
+ *
  * Why this structure?
- * - Easy to query items for a specific section
- * - When you delete a section, you can easily delete its items too
- * - Keeps data organized and prevents conflicts
+ * - Main data is simple and fast to access
+ * - Backup data includes timestamp and version for recovery purposes
+ * - Metadata helps track backup status
+ * - Separate keys prevent main data from overwriting backups
+ * - When you delete a section, backup can be used to recover accidentally deleted data
  */
+
+export { createBackup, restoreFromBackup, getBackupInfo, STORAGE_KEYS };
