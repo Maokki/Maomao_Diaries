@@ -1,4 +1,5 @@
-// app/components/Sidebar.jsx
+// Updated app/components/Sidebar.jsx - Exposes refresh function
+
 import {
   StyleSheet,
   Text,
@@ -12,14 +13,14 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
 import { useDiarySections } from '../hooks/useDiaryStorage';
 
 const SIDEBAR_WIDTH = 250;
 
-const Sidebar = () => {
+const Sidebar = ({ refreshRef }) => {  // ← accept refreshRef prop
   const [isOpen, setIsOpen] = useState(false);
   const [sectionText, setSectionText] = useState('');
   const [selectedSection, setSelectedSection] = useState(null);
@@ -27,8 +28,17 @@ const Sidebar = () => {
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
   const [renameText, setRenameText] = useState('');
 
-  const { sections, addSection, deleteSection, renameSection, isLoading } = useDiarySections();
+  // get sections and refresh function from hook
+  const { sections, addSection, deleteSection, renameSection, refreshSections, isLoading } = useDiarySections();
+  
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
+
+  // refresh function
+  useEffect(() => {
+    if (refreshRef) {
+      refreshRef.current = refreshSections;
+    }
+  }, [refreshRef, refreshSections]);
 
   const toggleSidebar = () => {
     const toValue = isOpen ? -SIDEBAR_WIDTH : 0;
@@ -135,6 +145,10 @@ const Sidebar = () => {
         ]}
       >
         <ScrollView showsVerticalScrollIndicator={true}>
+          <TouchableOpacity style={styles.backButton} onPress={toggleSidebar}>
+            <Ionicons name="arrow-back" size={24} color="#509107ff" />
+          </TouchableOpacity>
+
           <Text style={styles.sidebarTitle}>Diary Section</Text>
 
           <View style={styles.addSection}>
@@ -284,7 +298,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: 0,
     zIndex: 1000,
-    pointerEvents: 'box-none', 
+    pointerEvents: 'box-none',
   },
   toggleButton: {
     position: 'absolute',
@@ -303,11 +317,10 @@ const styles = StyleSheet.create({
     elevation: 5,
     zIndex: 1001,
   },
-  // fixed: use top/bottom instead of height
   sidebar: {
     position: "absolute",
     top: 0,
-    bottom: 0,      
+    bottom: 0,
     left: 0,
     width: SIDEBAR_WIDTH,
     backgroundColor: '#f8f8f8',
@@ -321,7 +334,6 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   sidebarTitle: {
-    marginTop: 80,
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,

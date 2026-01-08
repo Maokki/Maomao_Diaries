@@ -1,4 +1,4 @@
-// app/components/BackupButton.jsx
+//app/components/BackupButton.jsx
 
 import { 
   StyleSheet, 
@@ -8,18 +8,18 @@ import {
   Modal, 
   ScrollView,
   ActivityIndicator,
-  Alert 
 } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useBackupManager } from '../hooks/useBackupManager';
 
-const BackupButton = () => {
+const BackupButton = ({ onDataRefresh }) => {  // ← accept refresh callback
   const [modalVisible, setModalVisible] = useState(false);
   const [backupInfo, setBackupInfo] = useState(null);
-  const { exportBackup, importBackup, getBackupInfo, isProcessing } = useBackupManager();
+  
+  // Pass the refresh callback to the hook
+  const { exportBackup, importBackup, getBackupInfo, isProcessing } = useBackupManager(onDataRefresh);
 
-  // load backup info when modal opens
   useEffect(() => {
     if (modalVisible) {
       loadBackupInfo();
@@ -38,30 +38,26 @@ const BackupButton = () => {
 
   const handleImportMerge = async () => {
     setModalVisible(false);
-    await importBackup(false); // Merge with existing data
+    const result = await importBackup(false);
+    
+    // Reload backup info after successful import
+    if (result.success && !result.cancelled) {
+      await loadBackupInfo();
+    }
   };
 
   const handleImportReplace = async () => {
-    Alert.alert(
-      '⚠️ Warning',
-      'This will DELETE all your current data and replace it with the backup file. This action cannot be undone!\n\nAre you absolutely sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Yes, Replace All',
-          style: 'destructive',
-          onPress: async () => {
-            setModalVisible(false);
-            await importBackup(true); // Replace all data
-          },
-        },
-      ]
-    );
+    setModalVisible(false);
+    const result = await importBackup(true);
+    
+    // Reload backup info after successful import
+    if (result.success && !result.cancelled) {
+      await loadBackupInfo();
+    }
   };
 
   return (
     <>
-      {/* Floating Backup Button */}
       <TouchableOpacity
         style={styles.floatingButton}
         onPress={() => setModalVisible(true)}
@@ -70,7 +66,6 @@ const BackupButton = () => {
         <Ionicons name="cloud-upload-outline" size={24} color="white" />
       </TouchableOpacity>
 
-      {/* Backup Menu Modal */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -79,7 +74,6 @@ const BackupButton = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Backup & Restore</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
@@ -88,7 +82,6 @@ const BackupButton = () => {
             </View>
 
             <ScrollView style={styles.modalBody}>
-              {/* Backup Info Card */}
               <View style={styles.infoCard}>
                 <View style={styles.infoHeader}>
                   <Ionicons name="information-circle" size={24} color="#509107ff" />
@@ -110,7 +103,6 @@ const BackupButton = () => {
                 )}
               </View>
 
-              {/* Export Section */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Export Backup</Text>
                 <Text style={styles.sectionDescription}>
@@ -128,14 +120,12 @@ const BackupButton = () => {
                 </TouchableOpacity>
               </View>
 
-              {/* Import Section */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Import Backup</Text>
                 <Text style={styles.sectionDescription}>
                   Restore your diary from a backup file. Choose to merge with existing data or replace everything.
                 </Text>
 
-                {/* Merge Option */}
                 <TouchableOpacity
                   style={[styles.actionButton, styles.mergeButton]}
                   onPress={handleImportMerge}
@@ -153,7 +143,6 @@ const BackupButton = () => {
                   {'\n'}✓ Safe option - no data loss
                 </Text>
 
-                {/* Replace Option */}
                 <TouchableOpacity
                   style={[styles.actionButton, styles.replaceButton]}
                   onPress={handleImportReplace}
@@ -173,7 +162,6 @@ const BackupButton = () => {
               </View>
             </ScrollView>
 
-            {/* Loading Overlay */}
             {isProcessing && (
               <View style={styles.loadingOverlay}>
                 <View style={styles.loadingBox}>
@@ -195,7 +183,7 @@ const styles = StyleSheet.create({
   floatingButton: {
     position: 'absolute',
     right: 20,
-    top: 50,
+    top: 47,
     width: 56,
     height: 56,
     borderRadius: 28,
