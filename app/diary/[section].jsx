@@ -15,6 +15,7 @@ import React, { useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useDiaryItems } from '../hooks/useDiaryStorage'; // import custom hook
+import { Image } from 'react-native';
 
 const DiarySections = () => {
   const { section } = useLocalSearchParams();
@@ -24,10 +25,10 @@ const DiarySections = () => {
   // Pass the section name to load the correct items
   const { items, addItem, updateItem, deleteItem, isLoading } = useDiaryItems(section);
   
-  // State for expanded items (UI only, not stored)
+  // state for expanded items
   const [expandedItems, setExpandedItems] = useState({});
   
-  // State for modal
+  // state for modal
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [currentItem, setCurrentItem] = useState('');
   const [editingIndex, setEditingIndex] = useState(null);
@@ -120,9 +121,9 @@ const DiarySections = () => {
       <ScrollView style={styles.scrollView}>
         {items.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="document-text-outline" size={80} color="#ccc" />
+            <Image source={require('../../assets/hmmm.jpg')} style={{ width: 230, height: 230}} />
             <Text style={styles.emptyText}>No items yet</Text>
-            <Text style={styles.emptySubtext}>Tap the + button to add your first item</Text>
+            <Text style={styles.emptySubtext}>Tap the + button to as Maomao demands you to</Text>
           </View>
         ) : (
           items.map((item, index) => {

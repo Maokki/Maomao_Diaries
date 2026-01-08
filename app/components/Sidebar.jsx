@@ -186,8 +186,11 @@ const Sidebar = ({ refreshRef }) => {  // ← accept refreshRef prop
                     style={styles.categoryTouchable}
                   >
                     <Pressable style={styles.categoryItem} onPress={toggleSidebar}>
-                      <Text style={styles.categoryText}>📂 {section}</Text>
-                    </Pressable>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Ionicons name="calendar-outline" size={20} color="#0b8b09ff" />
+                      <Text style={styles.categoryText}>{section}</Text>
+                    </View>
+                  </Pressable>
                   </Link>
 
                   <TouchableOpacity
