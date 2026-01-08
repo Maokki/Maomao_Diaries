@@ -11,39 +11,32 @@ import {
   Modal,
   Alert,
   ScrollView,
-  Dimensions
 } from 'react-native';
 import React, { useRef, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
 import { useDiarySections } from '../hooks/useDiaryStorage';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SIDEBAR_WIDTH = 250;
 
 const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [sectionText, setSectionText] = useState('');
-  
   const [selectedSection, setSelectedSection] = useState(null);
   const [isContextMenuVisible, setIsContextMenuVisible] = useState(false);
-  
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
   const [renameText, setRenameText] = useState('');
-  
+
   const { sections, addSection, deleteSection, renameSection, isLoading } = useDiarySections();
-  
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
 
   const toggleSidebar = () => {
     const toValue = isOpen ? -SIDEBAR_WIDTH : 0;
-    
     Animated.timing(slideAnim, {
       toValue,
       duration: 300,
       useNativeDriver: true,
     }).start();
-    
     setIsOpen(!isOpen);
   };
 
@@ -82,15 +75,12 @@ const Sidebar = () => {
     if (renameText.trim() && renameText !== selectedSection) {
       try {
         await renameSection(selectedSection, renameText);
-        
         setIsRenameModalVisible(false);
         setRenameText('');
         setSelectedSection(null);
-        
         Alert.alert('Success', `Section renamed to "${renameText}"`);
       } catch (error) {
         console.error('Error renaming section:', error);
-        
         if (error.message === 'Section name already exists') {
           Alert.alert('Error', 'A section with this name already exists!');
         } else {
@@ -104,7 +94,6 @@ const Sidebar = () => {
 
   const handleDelete = () => {
     setIsContextMenuVisible(false);
-    
     Alert.alert(
       'Delete Section',
       `Are you sure you want to delete "${selectedSection}"? All items in this section will also be deleted.`,
@@ -122,7 +111,6 @@ const Sidebar = () => {
               const sectionToDelete = selectedSection;
               await deleteSection(selectedSection);
               setSelectedSection(null);
-              
               Alert.alert('Deleted', `Section "${sectionToDelete}" has been deleted.`);
             } catch (error) {
               console.error('Error deleting section:', error);
@@ -136,30 +124,17 @@ const Sidebar = () => {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.toggleButton}
-        onPress={toggleSidebar}
-      >
+      <TouchableOpacity style={styles.toggleButton} onPress={toggleSidebar}>
         <Ionicons name={isOpen ? "close" : "menu"} size={32} color="white" />
       </TouchableOpacity>
 
       <Animated.View
         style={[
           styles.sidebar,
-          {
-            transform: [{ translateX: slideAnim }]
-          }
+          { transform: [{ translateX: slideAnim }] }
         ]}
       >
-        {/* Header - NOT scrollable, stays fixed */}
-        <View style={styles.headerSection}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={toggleSidebar}
-          >
-            <Ionicons name="arrow-back" size={24} color="#509107ff" />
-          </TouchableOpacity>
-
+        <ScrollView showsVerticalScrollIndicator={true}>
           <Text style={styles.sidebarTitle}>Diary Section</Text>
 
           <View style={styles.addSection}>
@@ -176,45 +151,41 @@ const Sidebar = () => {
               <Ionicons name="add-circle" size={28} color="#509107ff" />
             </Pressable>
           </View>
-        </View>
 
-        {/* ScrollView - exactly like [section].jsx */}
-        <ScrollView style={styles.scrollView}>
-          {isLoading ? (
-            <View style={styles.emptyState}>
-              <ActivityIndicator size="large" color="#509107ff" />
-            </View>
-          ) : sections.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="folder-outline" size={80} color="#ccc" />
-              <Text style={styles.emptyText}>No sections yet</Text>
-              <Text style={styles.emptySubtext}>Add your first section above</Text>
-            </View>
-          ) : (
-            sections.map((section, index) => (
-              <View key={index} style={styles.categoryRow}>
-                <Link
-                  href={`/diary/${encodeURIComponent(section)}`}
-                  asChild
-                  style={styles.categoryTouchable}
-                >
-                  <Pressable
-                    style={styles.categoryItem}
-                    onPress={toggleSidebar}
-                  >
-                    <Text style={styles.categoryText}>📂 {section}</Text>
-                  </Pressable>
-                </Link>
-
-                <TouchableOpacity
-                  onPress={(e) => openContextMenu(section, e)}
-                  style={styles.menuButton}
-                >
-                  <Ionicons name="ellipsis-vertical" size={20} color="#666" />
-                </TouchableOpacity>
+          <View style={styles.categories}>
+            {isLoading ? (
+              <View style={styles.emptyState}>
+                <ActivityIndicator size="large" color="#509107ff" />
               </View>
-            ))
-          )}
+            ) : sections.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="folder-outline" size={80} color="#ccc" />
+                <Text style={styles.emptyText}>No sections yet</Text>
+                <Text style={styles.emptySubtext}>Add your first section above</Text>
+              </View>
+            ) : (
+              sections.map((section, index) => (
+                <View key={index} style={styles.categoryRow}>
+                  <Link
+                    href={`/diary/${encodeURIComponent(section)}`}
+                    asChild
+                    style={styles.categoryTouchable}
+                  >
+                    <Pressable style={styles.categoryItem} onPress={toggleSidebar}>
+                      <Text style={styles.categoryText}>📂 {section}</Text>
+                    </Pressable>
+                  </Link>
+
+                  <TouchableOpacity
+                    onPress={(e) => openContextMenu(section, e)}
+                    style={styles.menuButton}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={20} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </View>
         </ScrollView>
       </Animated.View>
 
@@ -225,25 +196,20 @@ const Sidebar = () => {
         animationType="fade"
         onRequestClose={closeContextMenu}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={closeContextMenu}
         >
           <View style={styles.contextMenu} onStartShouldSetResponder={() => true}>
-            <Text style={styles.contextMenuTitle}>
-              {selectedSection}
-            </Text>
-            
-            <TouchableOpacity 
-              style={styles.menuItem}
-              onPress={openRenameModal}
-            >
+            <Text style={styles.contextMenuTitle}>{selectedSection}</Text>
+
+            <TouchableOpacity style={styles.menuItem} onPress={openRenameModal}>
               <Ionicons name="create-outline" size={20} color="#509107ff" />
               <Text style={styles.menuItemText}>Rename</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.menuItem, styles.deleteMenuItem]}
               onPress={handleDelete}
             >
@@ -251,10 +217,7 @@ const Sidebar = () => {
               <Text style={[styles.menuItemText, { color: '#ff3b30' }]}>Delete</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.cancelMenuItem}
-              onPress={closeContextMenu}
-            >
+            <TouchableOpacity style={styles.cancelMenuItem} onPress={closeContextMenu}>
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -268,14 +231,14 @@ const Sidebar = () => {
         animationType="fade"
         onRequestClose={() => setIsRenameModalVisible(false)}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={() => setIsRenameModalVisible(false)}
         >
           <View style={styles.renameModal} onStartShouldSetResponder={() => true}>
             <Text style={styles.modalTitle}>Rename Section</Text>
-            
+
             <TextInput
               style={styles.modalInput}
               value={renameText}
@@ -287,7 +250,7 @@ const Sidebar = () => {
             />
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setIsRenameModalVisible(false);
@@ -297,7 +260,7 @@ const Sidebar = () => {
                 <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton]}
                 onPress={handleRename}
               >
@@ -319,7 +282,9 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     bottom: 0,
+    right: 0,
     zIndex: 1000,
+    pointerEvents: 'box-none', 
   },
   toggleButton: {
     position: 'absolute',
@@ -338,29 +303,17 @@ const styles = StyleSheet.create({
     elevation: 5,
     zIndex: 1001,
   },
+  // fixed: use top/bottom instead of height
   sidebar: {
     position: "absolute",
     top: 0,
+    bottom: 0,      
     left: 0,
     width: SIDEBAR_WIDTH,
-    height: SCREEN_HEIGHT,
     backgroundColor: '#f8f8f8',
-    borderRightWidth: 1,
-    borderRightColor: '#ddd',
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    zIndex: 100,
-  },
-  // Fixed header section
-  headerSection: {
     padding: 16,
     paddingTop: 24,
-    backgroundColor: '#f8f8f8',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    zIndex: 100,
   },
   backButton: {
     marginTop: 20,
@@ -368,15 +321,16 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   sidebarTitle: {
+    marginTop: 80,
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
     color: '#333',
   },
   addSection: {
-    flexDirection: 'row',  
-    alignItems: 'center',   
-    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
     gap: 10,
   },
   input: {
@@ -389,30 +343,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     color: '#333',
   },
-  // ScrollView - exactly like [section].jsx
-  scrollView: {
-    flex: 1,
-    padding: 15,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 50,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#999',
+  categories: {
     marginTop: 20,
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#bbb',
-    marginTop: 10,
-  },
   categoryRow: {
-    flexDirection: "row", 
-    alignItems: "center", 
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 12,
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -431,11 +367,27 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   categoryText: {
-    color: "#333", 
+    color: "#333",
     fontSize: 16,
   },
   menuButton: {
     padding: 8,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 50,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#999',
+    marginTop: 20,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#bbb',
+    marginTop: 10,
   },
   modalOverlay: {
     flex: 1,
