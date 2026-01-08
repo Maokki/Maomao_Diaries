@@ -167,7 +167,7 @@ const Sidebar = () => {
         <Ionicons name={isOpen ? "close" : "menu"} size={32} color="white" />
       </TouchableOpacity>
 
-      <Animated.View 
+      <Animated.View
         style={[
           styles.sidebar,
           {
@@ -175,35 +175,35 @@ const Sidebar = () => {
           }
         ]}
       >
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={toggleSidebar}
-        >
-          <Ionicons name="arrow-back" size={24} color="#509107ff" />
-        </TouchableOpacity>
-
-        <Text style={styles.sidebarTitle}>Diary Section</Text>
-
-        <View style={styles.addSection}>
-          <TextInput
-            style={styles.input}
-            placeholder="Add Section..."
-            placeholderTextColor="#999"
-            value={sectionText}
-            onChangeText={setSectionText}
-            onSubmitEditing={handleAddSection}
-            returnKeyType="done"
-          />
-          <Pressable onPress={handleAddSection}>
-            <Ionicons name="add-circle" size={28} color="#509107ff" />
-          </Pressable>
-        </View>
-
         <ScrollView
-          style={styles.sectionsScrollView}
+          style={styles.scrollContainer}
           showsVerticalScrollIndicator={true}
-          contentContainerStyle={styles.scrollViewContent}
+          contentContainerStyle={styles.scrollContent}
         >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={toggleSidebar}
+          >
+            <Ionicons name="arrow-back" size={24} color="#509107ff" />
+          </TouchableOpacity>
+
+          <Text style={styles.sidebarTitle}>Diary Section</Text>
+
+          <View style={styles.addSection}>
+            <TextInput
+              style={styles.input}
+              placeholder="Add Section..."
+              placeholderTextColor="#999"
+              value={sectionText}
+              onChangeText={setSectionText}
+              onSubmitEditing={handleAddSection}
+              returnKeyType="done"
+            />
+            <Pressable onPress={handleAddSection}>
+              <Ionicons name="add-circle" size={28} color="#509107ff" />
+            </Pressable>
+          </View>
+
           {isLoading ? (
             <ActivityIndicator size="large" color="#509107ff" />
           ) : (
@@ -380,12 +380,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f8f8',
     borderRightWidth: 1,
     borderRightColor: '#ddd',
-    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 2, height: 0 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
   },
   backButton: {
     marginTop: 40,
@@ -397,12 +403,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 30,
     color: '#333',
-  },
-  sectionsScrollView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    paddingBottom: 20,
   },
   menuItemWrapper: {
     flexDirection: 'row',
