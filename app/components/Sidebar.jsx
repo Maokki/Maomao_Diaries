@@ -9,17 +9,15 @@ import {
   Pressable,
   ActivityIndicator,
   Modal,
-  Alert,
-  ScrollView,
-  Dimensions
+  Alert
 } from 'react-native';
 import React, { useRef, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
 import { useDiarySections } from '../hooks/useDiaryStorage';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const SIDEBAR_WIDTH = 250;
+const { width } = Dimensions.get('window');
+const SIDEBAR_WIDTH = width * 0.7;
 
 const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -151,71 +149,60 @@ const Sidebar = () => {
           }
         ]}
       >
-        {/* EVERYTHING INSIDE SCROLLVIEW - All content scrolls together */}
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={true}
-          bounces={true}
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={toggleSidebar}
         >
-          {/* Back Button */}
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={toggleSidebar}
-          >
-            <Ionicons name="arrow-back" size={24} color="#509107ff" />
-          </TouchableOpacity>
+          <Ionicons name="arrow-back" size={24} color="#509107ff" />
+        </TouchableOpacity>
 
-          {/* Title */}
-          <Text style={styles.sidebarTitle}>Diary Section</Text>
+        <Text style={styles.sidebarTitle}>Diary Section</Text>
 
-          {/* Add Section Input */}
-          <View style={styles.addSection}>
-            <TextInput
-              style={styles.input}
-              placeholder="Add Section..."
-              placeholderTextColor="#999"
-              value={sectionText}
-              onChangeText={setSectionText}
-              onSubmitEditing={handleAddSection}
-              returnKeyType="done"
-            />
-            <Pressable onPress={handleAddSection}>
-              <Ionicons name="add-circle" size={28} color="#509107ff" />
-            </Pressable>
-          </View>
+        <View style={styles.addSection}>
+          <TextInput
+            style={styles.input}
+            placeholder="Add Section..."
+            placeholderTextColor="#999"
+            value={sectionText}
+            onChangeText={setSectionText}
+            onSubmitEditing={handleAddSection}
+            returnKeyType="done"
+          />
+          <Pressable onPress={handleAddSection}>
+            <Ionicons name="add-circle" size={28} color="#509107ff" />
+          </Pressable>
+        </View>
 
-          {/* Sections List */}
-          <View style={styles.sectionsContainer}>
-            {isLoading ? (
-              <ActivityIndicator size="large" color="#509107ff" style={{ marginTop: 20 }} />
-            ) : (
-              sections.map((section, index) => (
-                <View key={index} style={styles.categoryRow}>
-                  <Link
-                    href={`/diary/${encodeURIComponent(section)}`}
-                    asChild
-                    style={styles.categoryTouchable}
-                  >
-                    <Pressable
-                      style={styles.categoryItem}
-                      onPress={toggleSidebar}
-                    >
-                      <Text style={styles.categoryText}>📂 {section}</Text>
-                    </Pressable>
-                  </Link>
+        {isLoading ? (
+          <ActivityIndicator size="large" color="#509107ff" />
+        ) : (
+          sections.map((section, index) => (
+            <View key={index} style={styles.menuItemWrapper}>
+              <Link
+                href={`/diary/${encodeURIComponent(section)}`}
+                asChild
+                style={styles.linkWrapper}
+              >
+                <Pressable 
+                  style={styles.menuItem}
+                  onPress={toggleSidebar}
+                >
+                  <Text style={styles.menuText}>{section}</Text>
+                  <Ionicons name="chevron-forward" size={20} color="#999" />
+                </Pressable>
+              </Link>
 
-                  <TouchableOpacity
-                    onPress={(e) => openContextMenu(section, e)}
-                    style={styles.menuButton}
-                  >
-                    <Ionicons name="ellipsis-vertical" size={20} color="#666" />
-                  </TouchableOpacity>
-                </View>
-              ))
-            )}
-          </View>
-        </ScrollView>
+              <TouchableOpacity
+                style={styles.menuButton}
+                onPress={(e) => openContextMenu(section, e)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="ellipsis-horizontal" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+
       </Animated.View>
 
       {/* Context Menu Modal */}
@@ -363,6 +350,13 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 24,
     paddingBottom: 40, // Extra space at bottom
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
   },
   backButton: {
     marginTop: 20,
