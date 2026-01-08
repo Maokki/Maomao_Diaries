@@ -9,15 +9,17 @@ import {
   Pressable,
   ActivityIndicator,
   Modal,
-  Alert
+  Alert,
+  ScrollView,
+  Dimensions
 } from 'react-native';
 import React, { useRef, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
 import { useDiarySections } from '../hooks/useDiaryStorage';
 
-const { width } = Dimensions.get('window');
-const SIDEBAR_WIDTH = width * 0.7;
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const SIDEBAR_WIDTH = 250;
 
 const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -149,60 +151,71 @@ const Sidebar = () => {
           }
         ]}
       >
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={toggleSidebar}
-        >
-          <Ionicons name="arrow-back" size={24} color="#509107ff" />
-        </TouchableOpacity>
+        {/* Header - NOT scrollable, stays fixed */}
+        <View style={styles.headerSection}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={toggleSidebar}
+          >
+            <Ionicons name="arrow-back" size={24} color="#509107ff" />
+          </TouchableOpacity>
 
-        <Text style={styles.sidebarTitle}>Diary Section</Text>
+          <Text style={styles.sidebarTitle}>Diary Section</Text>
 
-        <View style={styles.addSection}>
-          <TextInput
-            style={styles.input}
-            placeholder="Add Section..."
-            placeholderTextColor="#999"
-            value={sectionText}
-            onChangeText={setSectionText}
-            onSubmitEditing={handleAddSection}
-            returnKeyType="done"
-          />
-          <Pressable onPress={handleAddSection}>
-            <Ionicons name="add-circle" size={28} color="#509107ff" />
-          </Pressable>
+          <View style={styles.addSection}>
+            <TextInput
+              style={styles.input}
+              placeholder="Add Section..."
+              placeholderTextColor="#999"
+              value={sectionText}
+              onChangeText={setSectionText}
+              onSubmitEditing={handleAddSection}
+              returnKeyType="done"
+            />
+            <Pressable onPress={handleAddSection}>
+              <Ionicons name="add-circle" size={28} color="#509107ff" />
+            </Pressable>
+          </View>
         </View>
 
-        {isLoading ? (
-          <ActivityIndicator size="large" color="#509107ff" />
-        ) : (
-          sections.map((section, index) => (
-            <View key={index} style={styles.menuItemWrapper}>
-              <Link
-                href={`/diary/${encodeURIComponent(section)}`}
-                asChild
-                style={styles.linkWrapper}
-              >
-                <Pressable 
-                  style={styles.menuItem}
-                  onPress={toggleSidebar}
-                >
-                  <Text style={styles.menuText}>{section}</Text>
-                  <Ionicons name="chevron-forward" size={20} color="#999" />
-                </Pressable>
-              </Link>
-
-              <TouchableOpacity
-                style={styles.menuButton}
-                onPress={(e) => openContextMenu(section, e)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="ellipsis-horizontal" size={20} color="#666" />
-              </TouchableOpacity>
+        {/* ScrollView - exactly like [section].jsx */}
+        <ScrollView style={styles.scrollView}>
+          {isLoading ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator size="large" color="#509107ff" />
             </View>
-          ))
-        )}
+          ) : sections.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="folder-outline" size={80} color="#ccc" />
+              <Text style={styles.emptyText}>No sections yet</Text>
+              <Text style={styles.emptySubtext}>Add your first section above</Text>
+            </View>
+          ) : (
+            sections.map((section, index) => (
+              <View key={index} style={styles.categoryRow}>
+                <Link
+                  href={`/diary/${encodeURIComponent(section)}`}
+                  asChild
+                  style={styles.categoryTouchable}
+                >
+                  <Pressable
+                    style={styles.categoryItem}
+                    onPress={toggleSidebar}
+                  >
+                    <Text style={styles.categoryText}>📂 {section}</Text>
+                  </Pressable>
+                </Link>
 
+                <TouchableOpacity
+                  onPress={(e) => openContextMenu(section, e)}
+                  style={styles.menuButton}
+                >
+                  <Ionicons name="ellipsis-vertical" size={20} color="#666" />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </ScrollView>
       </Animated.View>
 
       {/* Context Menu Modal */}
@@ -330,7 +343,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     width: SIDEBAR_WIDTH,
-    height: SCREEN_HEIGHT, // Full screen height
+    height: SCREEN_HEIGHT,
     backgroundColor: '#f8f8f8',
     borderRightWidth: 1,
     borderRightColor: '#ddd',
@@ -341,22 +354,13 @@ const styles = StyleSheet.create({
     elevation: 5,
     zIndex: 100,
   },
-  // ScrollView fills the entire sidebar
-  scrollView: {
-    flex: 1,
-  },
-  // Padding is in contentContainerStyle, not on the sidebar
-  scrollContent: {
+  // Fixed header section
+  headerSection: {
     padding: 16,
     paddingTop: 24,
-    paddingBottom: 40, // Extra space at bottom
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    backgroundColor: '#f8f8f8',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
   },
   backButton: {
     marginTop: 20,
@@ -372,7 +376,7 @@ const styles = StyleSheet.create({
   addSection: {
     flexDirection: 'row',  
     alignItems: 'center',   
-    marginBottom: 20,
+    marginBottom: 10,
     gap: 10,
   },
   input: {
@@ -385,23 +389,46 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     color: '#333',
   },
-  sectionsContainer: {
+  // ScrollView - exactly like [section].jsx
+  scrollView: {
+    flex: 1,
+    padding: 15,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 50,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#999',
+    marginTop: 20,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#bbb',
     marginTop: 10,
   },
   categoryRow: {
     flexDirection: "row", 
     alignItems: "center", 
-    marginBottom: 8,
-    borderBottomWidth: 1, 
-    borderBottomColor: "#ddd",
-    paddingBottom: 4,
+    marginBottom: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   categoryTouchable: {
     flex: 1,
   },
   categoryItem: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 8,
   },
   categoryText: {
     color: "#333", 
