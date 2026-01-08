@@ -123,7 +123,7 @@ const DiarySections = () => {
           <View style={styles.emptyState}>
             <Image source={require('../../assets/hmmm.jpg')} style={{ width: 230, height: 230}} />
             <Text style={styles.emptyText}>No items yet</Text>
-            <Text style={styles.emptySubtext}>Tap the + button to as Maomao demands you to</Text>
+            <Text style={styles.emptySubtext}>Tap the + button as Maomao demands you to</Text>
           </View>
         ) : (
           items.map((item, index) => {
