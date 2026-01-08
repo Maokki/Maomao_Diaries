@@ -1,16 +1,17 @@
 // app/components/Sidebar.jsx
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  TouchableOpacity, 
-  Animated, 
-  Dimensions, 
-  TextInput, 
-  Pressable, 
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Animated,
+  Dimensions,
+  TextInput,
+  Pressable,
   ActivityIndicator,
   Modal,
-  Alert
+  Alert,
+  ScrollView
 } from 'react-native';
 import React, { useRef, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -200,35 +201,41 @@ const Sidebar = () => {
           </Pressable>
         </View>
 
-        {isLoading ? (
-          <ActivityIndicator size="large" color="#509107ff" />
-        ) : (
-          sections.map((section, index) => (
-            <View key={index} style={styles.menuItemWrapper}>
-              <Link
-                href={`/diary/${encodeURIComponent(section)}`}
-                asChild
-                style={styles.linkWrapper}
-              >
-                <Pressable 
-                  style={styles.menuItem}
-                  onPress={toggleSidebar}
+        <ScrollView
+          style={styles.sectionsScrollView}
+          showsVerticalScrollIndicator={true}
+          contentContainerStyle={styles.scrollViewContent}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="large" color="#509107ff" />
+          ) : (
+            sections.map((section, index) => (
+              <View key={index} style={styles.menuItemWrapper}>
+                <Link
+                  href={`/diary/${encodeURIComponent(section)}`}
+                  asChild
+                  style={styles.linkWrapper}
                 >
-                  <Text style={styles.menuText}>{section}</Text>
-                  <Ionicons name="chevron-forward" size={20} color="#999" />
-                </Pressable>
-              </Link>
+                  <Pressable
+                    style={styles.menuItem}
+                    onPress={toggleSidebar}
+                  >
+                    <Text style={styles.menuText}>{section}</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#999" />
+                  </Pressable>
+                </Link>
 
-              <TouchableOpacity
-                style={styles.menuButton}
-                onPress={(e) => openContextMenu(section, e)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="ellipsis-horizontal" size={20} color="#666" />
-              </TouchableOpacity>
-            </View>
-          ))
-        )}
+                <TouchableOpacity
+                  style={styles.menuButton}
+                  onPress={(e) => openContextMenu(section, e)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="ellipsis-horizontal" size={20} color="#666" />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </ScrollView>
 
       </Animated.View>
 
@@ -392,6 +399,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 30,
     color: '#333',
+  },
+  sectionsScrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    paddingBottom: 20,
   },
   menuItemWrapper: {
     flexDirection: 'row',
