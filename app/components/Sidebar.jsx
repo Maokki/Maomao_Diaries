@@ -5,7 +5,6 @@ import {
   View,
   TouchableOpacity,
   Animated,
-  Dimensions,
   TextInput,
   Pressable,
   ActivityIndicator,
@@ -18,8 +17,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
 import { useDiarySections } from '../hooks/useDiaryStorage';
 
-const { width } = Dimensions.get('window');
-const SIDEBAR_WIDTH = width * 0.7;
+const SIDEBAR_WIDTH = 250;
 
 const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
