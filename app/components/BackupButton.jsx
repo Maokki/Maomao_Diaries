@@ -12,6 +12,7 @@ import {
 import React, { useState, useEffect } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useBackupManager } from '../hooks/useBackupManager';
+import { Image } from 'react-native';
 
 const BackupButton = ({ onDataRefresh }) => {  // ← accept refresh callback
   const [modalVisible, setModalVisible] = useState(false);
@@ -96,6 +97,9 @@ const BackupButton = ({ onDataRefresh }) => {  // ← accept refresh callback
                     <View style={styles.statRow}>
                       <Text style={styles.statLabel}>Total Items:</Text>
                       <Text style={styles.statValue}>{backupInfo.totalItems}</Text>
+                    </View>
+                    <View>
+                      <Image source={require('../../assets/jinshi_export.jpg')} style={{width: '100%', height: 250, marginBottom: 10}} resizeMode="contain" />
                     </View>
                   </View>
                 ) : (
