@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/maomao_icon-512.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -20,7 +20,8 @@
         "foregroundImage": "./assets/maomao_icon-512.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.nagiiiqt.MaomaoDiaries"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,7 +31,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/maomao_icon-512.png",
+          "image": "./assets/maomao_icon-512.png",
           "imageWidth": 220,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -39,6 +40,13 @@
           }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "19f78d82-ea9e-42bc-a93c-71df133a4e46"
+      }
+    },
+    "owner": "nagiiiqt"
   }
 }

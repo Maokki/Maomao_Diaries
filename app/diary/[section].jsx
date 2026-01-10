@@ -9,7 +9,8 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert
 } from 'react-native'
 import React, { useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -66,20 +67,38 @@ const DiarySections = () => {
     }
   };
 
-  const handleDeleteItem = async (index) => {
-    try {
-      await deleteItem(index);
-      
-      const itemToDelete = items[index];
-      setExpandedItems(prev => {
-        const newExpanded = {...prev};
-        delete newExpanded[itemToDelete.id];
-        return newExpanded;
-      });
-    } catch (error) {
-      console.error('Error deleting item:', error);
-      alert('Failed to delete item. Please try again.');
-    }
+  const handleDeleteItem = (index) => {
+    const itemToDelete = items[index];
+    
+    Alert.alert(
+      'Delete Entry',
+      'Are you sure you want to delete this diary entry? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteItem(index);
+              
+              // Remove from expanded items
+              setExpandedItems(prev => {
+                const newExpanded = {...prev};
+                delete newExpanded[itemToDelete.id];
+                return newExpanded;
+              });
+            } catch (error) {
+              console.error('Error deleting item:', error);
+              Alert.alert('Error', 'Failed to delete item. Please try again.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (isLoading) {
