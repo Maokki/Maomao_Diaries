@@ -173,7 +173,7 @@ const DiarySections = () => {
                   
                   <Text 
                     style={styles.itemText} 
-                    numberOfLines={isExpanded ? undefined : 1}
+                    numberOfLines={isExpanded ? undefined : 3}
                   >
                     {item.text}
                   </Text>

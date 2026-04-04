@@ -5,18 +5,41 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
 import Sidebar from './components/Sidebar';
 import BackupButton from './components/BackupButton';
+import AISearch from './components/AISearch';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDiarySections } from './hooks/useDiaryStorage';
 import { getRandomQuote } from './utils/maomaoQuotes';
 
 export default function Home() {
   const sidebarRefreshRef = useRef(null);
-  const { sections, items } = useDiarySections();
+  const { sections } = useDiarySections();
+  const [totalItems, setTotalItems] = useState(0);
   const [greeting, setGreeting] = useState('');
   const [currentQuote, setCurrentQuote] = useState({ text: '', context: '' });
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+
+  // Load total diary item count across all sections
+  useEffect(() => {
+    const loadTotalItems = async () => {
+      try {
+        let total = 0;
+        for (const section of sections) {
+          const stored = await AsyncStorage.getItem(`@diary_items_${section}`);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            total += parsed.length;
+          }
+        }
+        setTotalItems(total);
+      } catch (e) {
+        console.error('Error counting diary items:', e);
+      }
+    };
+    loadTotalItems();
+  }, [sections]);
 
   useEffect(() => {
     // Set greeting based on time of day
@@ -107,18 +130,14 @@ export default function Home() {
                 <Ionicons name="folder-open" size={28} color="#7B5E7B" />
               </View>
               <Text style={styles.statNumber}>{sections.length}</Text>
-              <Text style={styles.statLabel}>Months</Text>
+              <Text style={styles.statLabel}>Sections</Text>
             </View>
 
             <View style={styles.statCard}>
               <View style={[styles.statIconCircle, { backgroundColor: '#E8F5E9' }]}>
                 <Ionicons name="book" size={28} color="#6B8E4E" />
               </View>
-              <Text style={styles.statNumber}>
-                {sections.reduce((total, section) => {
-                  return total;
-                }, 0) || '∞'}
-              </Text>
+              <Text style={styles.statNumber}>{totalItems}</Text>
               <Text style={styles.statLabel}>Diaries</Text>
             </View>
           </View>
@@ -239,6 +258,7 @@ export default function Home() {
 
       <Sidebar refreshRef={sidebarRefreshRef} />
       <BackupButton onDataRefresh={handleDataRefresh} />
+      <AISearch sections={sections} />
     </View>
   );
 }
