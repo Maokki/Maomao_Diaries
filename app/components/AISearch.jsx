@@ -19,9 +19,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 
 const EXAMPLE_QUERIES = [
-  'When did I go to the mall?',
+  'When did I go out?',
   'What made me happy recently?',
-  'Did I mention any food?',
+  'How did I able to fight the recent challenges?',
   'What did I do last weekend?',
 ];
 
@@ -68,18 +68,19 @@ export default function AISearch({ sections = [] }) {
   };
 
   const handleSend = async () => {
+    console.log("Current API Key check:", GEMINI_API_KEY ? "Key exists" : "Key is MISSING");
     if (!query.trim() || loading) return;
 
     // CHECK FOR INTERNET FIRST
     const state = await NetInfo.fetch();
-    if (!state.isConnected) {
-      setError("The Apothecary is out gathering herbs and has no signal. Please check your connection.");
-      // We still show the user's message so they don't lose it
+    
+    if (state.isConnected === false) {
+      setError("Maomao is out gathering herbs and has no signal. Please check your connection.");
       setMessages(prev => [...prev, { role: 'user', text: query.trim() }]);
       setQuery(''); 
       return;
     }
-    
+
     const userText = query.trim();
     setQuery('');
     setError(null);
@@ -116,8 +117,15 @@ export default function AISearch({ sections = [] }) {
       const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "I cannot read that.";
       setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
     } catch (e) {
-      // Handle timeout or sudden loss of connection during the request
-      setError("The connection was lost mid-search. Maomao is having trouble reaching the palace archives.");
+      const errorMsg = e.message || "";
+      
+      if (errorMsg.includes("quota") || errorMsg.includes("429")) {
+        setError("Maomao is overwhelmed with tasks right now because of that Jinshi-t! Please wait a moment before asking another question.");
+      } else if (errorMsg.includes("Network request failed")) {
+        setError("The connection was lost. Maomao cannot work with you right now.");
+      } else {
+        setError("Diary checking error occurred. Please try again in a moment.");
+      }
     } finally {
       setLoading(false);
       // In Top-Input mode, scroll to the top to see the newest AI response immediately
@@ -211,7 +219,18 @@ export default function AISearch({ sections = [] }) {
 
               {messages.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Text style={styles.emptyTitle}>Start Searching</Text>
+                  <View style={styles.emptyImageContainer}>
+                  <Image
+                    source={require('../../assets/ok_mao.jpg')}
+                    style={{
+                      width: 180,
+                      height: 180,
+                      borderRadius: 90,
+                    }}
+                    resizeMode="cover"
+                  />
+                  </View>
+                  <Text style={styles.emptyTitle}>Maomao is glimmering to examine your body for poison. Start talking to her!</Text>
                   <View style={styles.examplesWrap}>
                     {EXAMPLE_QUERIES.map((ex, i) => (
                       <TouchableOpacity 
@@ -256,7 +275,6 @@ export default function AISearch({ sections = [] }) {
                       </Text>
                     </View>
                     
-                    {/* Optional: Simple spacer for User messages to keep alignment perfect */}
                     {msg.role === 'user' && <View style={{ width: 0 }} />}
                   </View>
                 ))
@@ -365,7 +383,7 @@ const styles = StyleSheet.create({
   loaderText: { color: '#6B8E4E', fontSize: 13, fontWeight: '600' },
 
   emptyState: { alignItems: 'center', marginTop: 20 },
-  emptyTitle: { fontSize: 14, fontWeight: 'bold', color: '#8B8680', marginBottom: 15, textTransform: 'uppercase' },
+  emptyTitle: { textAlign: 'center', fontSize: 14, fontWeight: 'bold', color: '#8B8680', marginBottom: 15, textTransform: 'uppercase' },
   examplesWrap: { width: '100%', gap: 8 },
   exampleChip: { backgroundColor: 'white', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#EDE7F6' },
   exampleChipText: { color: '#4A403A', fontSize: 14 },
@@ -391,9 +409,9 @@ const styles = StyleSheet.create({
   aiAvatar: {
     width: 36,
     height: 36,
-    borderRadius: 18, // Perfect circle
+    borderRadius: 18, 
     borderWidth: 1.5,
-    borderColor: '#D4A574', // Maomao Gold border around the image
+    borderColor: '#D4A574', 
     backgroundColor: '#F5EFE6',
   },
   onlineStatus: {
@@ -429,4 +447,5 @@ const styles = StyleSheet.create({
   },
   userText: { color: 'white', fontSize: 15 },
   aiText: { color: '#4A403A', fontSize: 15, lineHeight: 22 },
+  emptyImageContainer: { width: 200, height: 200, borderRadius: 100, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', marginBottom: 24, borderWidth: 4, borderColor: '#D4A574', shadowColor: '#6B8E4E', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 6, }
 });
