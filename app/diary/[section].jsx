@@ -15,7 +15,7 @@ import {
 import React, { useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { useDiaryItems } from '../_hooks/useDiaryStorage';
+import { useDiaryItems } from '../../hooks/useDiaryStorage';
 import { Image } from 'react-native';
 
 const DiarySections = () => {

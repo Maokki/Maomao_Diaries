@@ -16,7 +16,7 @@ import {
 import React, { useRef, useState, useEffect } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
-import { useDiarySections } from '../app/_hooks/useDiaryStorage';
+import { useDiarySections } from '../hooks/useDiaryStorage';
 
 const SIDEBAR_WIDTH = 280;
 

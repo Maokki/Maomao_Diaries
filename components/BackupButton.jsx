@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useBackupManager } from '../app/_hooks/useBackupManager';
+import { useBackupManager } from '../hooks/useBackupManager';
 import { Image } from 'react-native';
 
 const BackupButton = ({ onDataRefresh }) => {
