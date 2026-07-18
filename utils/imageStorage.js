@@ -1,5 +1,5 @@
 // utils/imageStorage.js
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const IMAGE_DIR = FileSystem.documentDirectory + 'diary_images/';
 
