@@ -13,12 +13,106 @@ import {
   Alert,
   Image
 } from 'react-native'
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import * as ImagePicker from 'expo-image-picker'
 import { useDiaryItems } from '../../hooks/useDiaryStorage';
 import { persistPickedImage, deletePersistedImage } from '../../utils/imageStorage';
+
+// --- Inline image marker helpers -------------------------------------
+// Images are attached "in place" by embedding a small marker token into
+// the diary text at the cursor position, e.g. ⟦img:1737209123456_482.jpg⟧.
+// The marker references an image purely by its persisted filename, so it
+// stays valid regardless of array ordering and needs no extra state.
+const imageIdFromUri = (uri) => uri.split('/').pop();
+
+const makeImageMarker = (uri) => `⟦img:${imageIdFromUri(uri)}⟧`;
+
+const newImageMarkerRegex = () => /⟦img:([^⟧]+)⟧/g;
+
+const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const findUriForMarkerId = (images, id) =>
+  images.find((uri) => imageIdFromUri(uri) === id);
+
+/** Splits diary text into ordered text/image blocks for display. */
+const parseDiaryContent = (text, images = []) => {
+  const blocks = [];
+  const seen = new Set();
+  let lastIndex = 0;
+  const regex = newImageMarkerRegex();
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const chunk = text.slice(lastIndex, match.index);
+    if (chunk.trim().length > 0) {
+      blocks.push({ type: 'text', value: chunk.trim() });
+    }
+    const uri = findUriForMarkerId(images, match[1]);
+    if (uri) {
+      blocks.push({ type: 'image', uri });
+      seen.add(uri);
+    }
+    lastIndex = match.index + match[0].length;
+  }
+  const tail = text.slice(lastIndex);
+  if (tail.trim().length > 0) {
+    blocks.push({ type: 'text', value: tail.trim() });
+  }
+  // Legacy entries (saved before inline attaching existed) may have images
+  // with no marker in the text at all — show those at the end as before.
+  images.forEach((uri) => {
+    if (!seen.has(uri)) {
+      blocks.push({ type: 'image', uri });
+    }
+  });
+  return blocks;
+};
+
+/** Plain-text preview with marker tokens removed (for collapsed previews). */
+const stripImageMarkers = (text) =>
+  text.replace(newImageMarkerRegex(), ' ').replace(/\s+/g, ' ').trim();
+
+/** Images in the order they appear in the text, with any un-referenced
+ *  (legacy) images appended at the end. Used to keep the editor's photo
+ *  strip in sync with where each photo actually sits in the entry. */
+const getOrderedImages = (text, imageList) => {
+  const ordered = [];
+  const seen = new Set();
+  const regex = newImageMarkerRegex();
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const uri = findUriForMarkerId(imageList, match[1]);
+    if (uri && !seen.has(uri)) {
+      ordered.push(uri);
+      seen.add(uri);
+    }
+  }
+  imageList.forEach((uri) => {
+    if (!seen.has(uri)) {
+      ordered.push(uri);
+      seen.add(uri);
+    }
+  });
+  return ordered;
+};
+
+/** Inserts an image marker into `text` at `position`, keeping it on its
+ *  own line, and returns the new text plus the cursor position right
+ *  after the inserted marker. */
+const insertMarkerAtPosition = (text, uri, position) => {
+  const pos = Math.max(0, Math.min(position ?? text.length, text.length));
+  const before = text.slice(0, pos);
+  const after = text.slice(pos);
+  const marker = makeImageMarker(uri);
+  const needsLeadingNewline = before.length > 0 && !before.endsWith('\n');
+  const needsTrailingNewline = after.length > 0 && !after.startsWith('\n');
+  const inserted = `${needsLeadingNewline ? '\n' : ''}${marker}\n${needsTrailingNewline ? '' : ''}`;
+  const newText = before + inserted + after;
+  const newCursor = before.length + inserted.length;
+  return { newText, newCursor };
+};
+// -----------------------------------------------------------------------
 
 const DiarySections = () => {
   const { section } = useLocalSearchParams();
@@ -33,6 +127,13 @@ const DiarySections = () => {
   const [images, setImages] = useState([]);
   const [sessionAddedImages, setSessionAddedImages] = useState([]);
   const [isPickingImage, setIsPickingImage] = useState(false);
+
+  // Tracks where the typing cursor is in the notepad so a newly added photo
+  // can be inserted right there instead of always at the end. cursorPosRef
+  // updates on every selection change without re-rendering; forcedSelection
+  // is only set momentarily to move the caret after a programmatic insert.
+  const cursorPosRef = useRef(0);
+  const [forcedSelection, setForcedSelection] = useState(undefined);
 
   // Full-screen viewer for a tapped thumbnail
   const [viewerImage, setViewerImage] = useState(null);
@@ -49,14 +150,20 @@ const DiarySections = () => {
     setEditingIndex(null);
     setImages([]);
     setSessionAddedImages([]);
+    cursorPosRef.current = 0;
+    setForcedSelection(undefined);
     setIsModalVisible(true);
   };
 
   const openEditItem = (index) => {
-    setCurrentItem(items[index].text);
+    const text = items[index].text;
+    setCurrentItem(text);
     setEditingIndex(index);
     setImages(items[index].images || []);
     setSessionAddedImages([]);
+    // Default the cursor to the end of the existing entry.
+    cursorPosRef.current = text.length;
+    setForcedSelection(undefined);
     setIsModalVisible(true);
   };
 
@@ -94,18 +201,40 @@ const DiarySections = () => {
     }
   };
 
-  const addPickedImage = async (tempUri) => {
-    try {
-      setIsPickingImage(true);
-      const persistedUri = await persistPickedImage(tempUri);
-      setImages((prev) => [...prev, persistedUri]);
-      setSessionAddedImages((prev) => [...prev, persistedUri]);
-    } catch (error) {
-      console.error('Error saving picked image:', error);
-      Alert.alert('Error', 'Could not attach that image. Please try again.');
-    } finally {
-      setIsPickingImage(false);
+  // Persists one or more picked images and inserts a marker for each,
+  // one after another, at the current cursor position.
+  const addPickedImages = async (tempUris) => {
+    setIsPickingImage(true);
+    let workingText = currentItem;
+    let workingCursor = cursorPosRef.current;
+    const newlyPersisted = [];
+
+    for (const tempUri of tempUris) {
+      try {
+        const persistedUri = await persistPickedImage(tempUri);
+        const { newText, newCursor } = insertMarkerAtPosition(
+          workingText,
+          persistedUri,
+          workingCursor
+        );
+        workingText = newText;
+        workingCursor = newCursor;
+        newlyPersisted.push(persistedUri);
+      } catch (error) {
+        console.error('Error saving picked image:', error);
+        Alert.alert('Error', 'Could not attach that image. Please try again.');
+      }
     }
+
+    if (newlyPersisted.length > 0) {
+      setCurrentItem(workingText);
+      cursorPosRef.current = workingCursor;
+      setForcedSelection({ start: workingCursor, end: workingCursor });
+      setImages((prev) => [...prev, ...newlyPersisted]);
+      setSessionAddedImages((prev) => [...prev, ...newlyPersisted]);
+    }
+
+    setIsPickingImage(false);
   };
 
   const pickFromGallery = async () => {
@@ -126,9 +255,7 @@ const DiarySections = () => {
     });
 
     if (!result.canceled) {
-      for (const asset of result.assets) {
-        await addPickedImage(asset.uri);
-      }
+      await addPickedImages(result.assets.map((asset) => asset.uri));
     }
   };
 
@@ -148,8 +275,15 @@ const DiarySections = () => {
     });
 
     if (!result.canceled) {
-      await addPickedImage(result.assets[0].uri);
+      await addPickedImages([result.assets[0].uri]);
     }
+  };
+
+  // Keeps cursorPosRef current as the user types or taps around, and
+  // releases the momentary forced-selection once it's been applied.
+  const handleSelectionChange = (e) => {
+    cursorPosRef.current = e.nativeEvent.selection.start;
+    if (forcedSelection) setForcedSelection(undefined);
   };
 
   const handleAddImage = () => {
@@ -161,6 +295,15 @@ const DiarySections = () => {
   };
 
   const removeImage = async (uriToRemove) => {
+    // Strip the marker for this image out of the text too, so it doesn't
+    // leave a dangling token where the photo used to be.
+    const markerPattern = new RegExp(
+      `\\n?⟦img:${escapeRegExp(imageIdFromUri(uriToRemove))}⟧\\n?`,
+      'g'
+    );
+    setCurrentItem((prev) =>
+      prev.replace(markerPattern, '\n').replace(/\n{3,}/g, '\n\n')
+    );
     setImages((prev) => prev.filter((uri) => uri !== uriToRemove));
 
     // Only newly-added-this-session images are safe to delete immediately.
@@ -276,14 +419,31 @@ const DiarySections = () => {
                     </View>
                   </View>
                   
-                  <Text 
-                    style={styles.itemText} 
-                    numberOfLines={isExpanded ? undefined : 3}
-                  >
-                    {item.text}
-                  </Text>
+                  {isExpanded ? (
+                    <View style={styles.inlineContent}>
+                      {parseDiaryContent(item.text, item.images || []).map((block, i) =>
+                        block.type === 'text' ? (
+                          <Text key={i} style={styles.itemText}>
+                            {block.value}
+                          </Text>
+                        ) : (
+                          <TouchableOpacity
+                            key={i}
+                            onPress={() => setViewerImage(block.uri)}
+                            style={styles.inlineImageWrapper}
+                          >
+                            <Image source={{ uri: block.uri }} style={styles.inlineImage} />
+                          </TouchableOpacity>
+                        )
+                      )}
+                    </View>
+                  ) : (
+                    <Text style={styles.itemText} numberOfLines={3}>
+                      {stripImageMarkers(item.text)}
+                    </Text>
+                  )}
 
-                  {item.images && item.images.length > 0 && (
+                  {!isExpanded && item.images && item.images.length > 0 && (
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={false}
@@ -381,18 +541,21 @@ const DiarySections = () => {
               placeholderTextColor="#B8A5B8"
               value={currentItem}
               onChangeText={setCurrentItem}
+              onSelectionChange={handleSelectionChange}
+              selection={forcedSelection}
               textAlignVertical="top"
               autoFocus
             />
 
-            {/* Attached image previews */}
+            {/* Attached image previews, ordered to match where each photo
+                actually sits in the text above */}
             {images.length > 0 && (
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 style={styles.imagePreviewRow}
               >
-                {images.map((uri, imgIndex) => (
+                {getOrderedImages(currentItem, images).map((uri, imgIndex) => (
                   <View key={imgIndex} style={styles.imagePreviewWrapper}>
                     <Image source={{ uri }} style={styles.imagePreview} />
                     <TouchableOpacity
@@ -628,6 +791,20 @@ const styles = StyleSheet.create({
   },
   thumbnailRow: {
     marginBottom: 12,
+  },
+  inlineContent: {
+    marginBottom: 12,
+    gap: 10,
+  },
+  inlineImageWrapper: {
+    alignSelf: 'stretch',
+  },
+  inlineImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#EDE7F6',
   },
   thumbnail: {
     width: 64,
