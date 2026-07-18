@@ -20,11 +20,6 @@ import * as ImagePicker from 'expo-image-picker'
 import { useDiaryItems } from '../../hooks/useDiaryStorage';
 import { persistPickedImage, deletePersistedImage } from '../../utils/imageStorage';
 
-// --- Inline image marker helpers -------------------------------------
-// Images are attached "in place" by embedding a small marker token into
-// the diary text at the cursor position, e.g. ⟦img:1737209123456_482.jpg⟧.
-// The marker references an image purely by its persisted filename, so it
-// stays valid regardless of array ordering and needs no extra state.
 const imageIdFromUri = (uri) => uri.split('/').pop();
 
 const makeImageMarker = (uri) => `⟦img:${imageIdFromUri(uri)}⟧`;
@@ -59,8 +54,7 @@ const parseDiaryContent = (text, images = []) => {
   if (tail.trim().length > 0) {
     blocks.push({ type: 'text', value: tail.trim() });
   }
-  // Legacy entries (saved before inline attaching existed) may have images
-  // with no marker in the text at all — show those at the end as before.
+  
   images.forEach((uri) => {
     if (!seen.has(uri)) {
       blocks.push({ type: 'image', uri });
@@ -69,13 +63,14 @@ const parseDiaryContent = (text, images = []) => {
   return blocks;
 };
 
-/** Plain-text preview with marker tokens removed (for collapsed previews). */
-const stripImageMarkers = (text) =>
-  text.replace(newImageMarkerRegex(), ' ').replace(/\s+/g, ' ').trim();
 
-/** Images in the order they appear in the text, with any un-referenced
- *  (legacy) images appended at the end. Used to keep the editor's photo
- *  strip in sync with where each photo actually sits in the entry. */
+const stripImageMarkers = (text) => {
+  const regex = newImageMarkerRegex();
+  let result = text.replace(regex, '');
+  result = result.replace(/\n[ \t]*\n[ \t]*\n/g, '\n\n');
+  return result.trim();
+};
+
 const getOrderedImages = (text, imageList) => {
   const ordered = [];
   const seen = new Set();
@@ -97,9 +92,6 @@ const getOrderedImages = (text, imageList) => {
   return ordered;
 };
 
-/** Inserts an image marker into `text` at `position`, keeping it on its
- *  own line, and returns the new text plus the cursor position right
- *  after the inserted marker. */
 const insertMarkerAtPosition = (text, uri, position) => {
   const pos = Math.max(0, Math.min(position ?? text.length, text.length));
   const before = text.slice(0, pos);
@@ -112,7 +104,6 @@ const insertMarkerAtPosition = (text, uri, position) => {
   const newCursor = before.length + inserted.length;
   return { newText, newCursor };
 };
-// -----------------------------------------------------------------------
 
 const DiarySections = () => {
   const { section } = useLocalSearchParams();
@@ -127,11 +118,6 @@ const DiarySections = () => {
   const [images, setImages] = useState([]);
   const [sessionAddedImages, setSessionAddedImages] = useState([]);
   const [isPickingImage, setIsPickingImage] = useState(false);
-
-  // Tracks where the typing cursor is in the notepad so a newly added photo
-  // can be inserted right there instead of always at the end. cursorPosRef
-  // updates on every selection change without re-rendering; forcedSelection
-  // is only set momentarily to move the caret after a programmatic insert.
   const cursorPosRef = useRef(0);
   const [forcedSelection, setForcedSelection] = useState(undefined);
 
@@ -201,8 +187,6 @@ const DiarySections = () => {
     }
   };
 
-  // Persists one or more picked images and inserts a marker for each,
-  // one after another, at the current cursor position.
   const addPickedImages = async (tempUris) => {
     setIsPickingImage(true);
     let workingText = currentItem;
@@ -443,23 +427,6 @@ const DiarySections = () => {
                     </Text>
                   )}
 
-                  {!isExpanded && item.images && item.images.length > 0 && (
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.thumbnailRow}
-                    >
-                      {item.images.map((uri, imgIndex) => (
-                        <TouchableOpacity
-                          key={imgIndex}
-                          onPress={() => setViewerImage(uri)}
-                        >
-                          <Image source={{ uri }} style={styles.thumbnail} />
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  )}
-                  
                   <View style={styles.itemFooter}>
                     <View style={styles.dateContainer}>
                       <Ionicons name="time-outline" size={14} color="#B8A5B8" />
