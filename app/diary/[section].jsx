@@ -1,4 +1,4 @@
-// app/diary/[section].jsx - Maomao Aesthetic
+// app/diary/[section].jsx
 import { 
   StyleSheet, 
   Text, 
@@ -10,13 +10,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert
+  Alert,
+  Image
 } from 'react-native'
 import React, { useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import Ionicons from '@expo/vector-icons/Ionicons'
+import * as ImagePicker from 'expo-image-picker'
 import { useDiaryItems } from '../../hooks/useDiaryStorage';
-import { Image } from 'react-native';
+import { persistPickedImage, deletePersistedImage } from '../../utils/imageStorage';
 
 const DiarySections = () => {
   const { section } = useLocalSearchParams();
@@ -28,6 +30,12 @@ const DiarySections = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [currentItem, setCurrentItem] = useState('');
   const [editingIndex, setEditingIndex] = useState(null);
+  const [images, setImages] = useState([]);
+  const [sessionAddedImages, setSessionAddedImages] = useState([]);
+  const [isPickingImage, setIsPickingImage] = useState(false);
+
+  // Full-screen viewer for a tapped thumbnail
+  const [viewerImage, setViewerImage] = useState(null);
 
   const toggleExpand = (id) => {
     setExpandedItems(prev => ({
@@ -39,31 +47,128 @@ const DiarySections = () => {
   const openNewItem = () => {
     setCurrentItem('');
     setEditingIndex(null);
+    setImages([]);
+    setSessionAddedImages([]);
     setIsModalVisible(true);
   };
 
   const openEditItem = (index) => {
     setCurrentItem(items[index].text);
     setEditingIndex(index);
+    setImages(items[index].images || []);
+    setSessionAddedImages([]);
     setIsModalVisible(true);
+  };
+
+  const closeModal = async () => {
+    // Discard any images added during this session that never got saved
+    if (sessionAddedImages.length > 0) {
+      const stillPresent = sessionAddedImages.filter((uri) => images.includes(uri));
+      await Promise.all(stillPresent.map((uri) => deletePersistedImage(uri)));
+    }
+    setIsModalVisible(false);
+    setCurrentItem('');
+    setEditingIndex(null);
+    setImages([]);
+    setSessionAddedImages([]);
   };
 
   const saveItem = async () => {
     if (currentItem.trim()) {
       try {
         if (editingIndex !== null) {
-          await updateItem(editingIndex, currentItem);
+          await updateItem(editingIndex, currentItem, images);
         } else {
-          await addItem(currentItem);
+          await addItem(currentItem, images);
         }
         
         setIsModalVisible(false);
         setCurrentItem('');
         setEditingIndex(null);
+        setImages([]);
+        setSessionAddedImages([]);
       } catch (error) {
         console.error('Error saving item:', error);
         alert('Failed to save item. Please try again.');
       }
+    }
+  };
+
+  const addPickedImage = async (tempUri) => {
+    try {
+      setIsPickingImage(true);
+      const persistedUri = await persistPickedImage(tempUri);
+      setImages((prev) => [...prev, persistedUri]);
+      setSessionAddedImages((prev) => [...prev, persistedUri]);
+    } catch (error) {
+      console.error('Error saving picked image:', error);
+      Alert.alert('Error', 'Could not attach that image. Please try again.');
+    } finally {
+      setIsPickingImage(false);
+    }
+  };
+
+  const pickFromGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission needed',
+        'Maomao needs access to your gallery to attach photos to your diary.'
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      allowsMultipleSelection: true,
+      selectionLimit: 5,
+    });
+
+    if (!result.canceled) {
+      for (const asset of result.assets) {
+        await addPickedImage(asset.uri);
+      }
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission needed',
+        'Maomao needs camera access to take a photo for your diary.'
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.7,
+      allowsEditing: false,
+    });
+
+    if (!result.canceled) {
+      await addPickedImage(result.assets[0].uri);
+    }
+  };
+
+  const handleAddImage = () => {
+    Alert.alert('Add a Photo', 'Where would you like to add a photo from?', [
+      { text: 'Take Photo', onPress: takePhoto },
+      { text: 'Choose from Gallery', onPress: pickFromGallery },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const removeImage = async (uriToRemove) => {
+    setImages((prev) => prev.filter((uri) => uri !== uriToRemove));
+
+    // Only newly-added-this-session images are safe to delete immediately.
+    // Pre-existing images stay on disk until Save actually commits the
+    // removal (handled by updateItem's own cleanup diff).
+    if (sessionAddedImages.includes(uriToRemove)) {
+      await deletePersistedImage(uriToRemove);
+      setSessionAddedImages((prev) => prev.filter((uri) => uri !== uriToRemove));
     }
   };
 
@@ -177,6 +282,23 @@ const DiarySections = () => {
                   >
                     {item.text}
                   </Text>
+
+                  {item.images && item.images.length > 0 && (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.thumbnailRow}
+                    >
+                      {item.images.map((uri, imgIndex) => (
+                        <TouchableOpacity
+                          key={imgIndex}
+                          onPress={() => setViewerImage(uri)}
+                        >
+                          <Image source={{ uri }} style={styles.thumbnail} />
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  )}
                   
                   <View style={styles.itemFooter}>
                     <View style={styles.dateContainer}>
@@ -216,7 +338,7 @@ const DiarySections = () => {
         visible={isModalVisible}
         animationType="slide"
         transparent={false}
-        onRequestClose={() => setIsModalVisible(false)}
+        onRequestClose={closeModal}
       >
         <KeyboardAvoidingView 
           style={styles.modalContainer}
@@ -225,7 +347,7 @@ const DiarySections = () => {
           {/* Modal Header */}
           <View style={styles.modalHeader}>
             <TouchableOpacity 
-              onPress={() => setIsModalVisible(false)}
+              onPress={closeModal}
               style={styles.modalCancelButton}
             >
               <Text style={styles.cancelText}>Cancel</Text>
@@ -262,8 +384,69 @@ const DiarySections = () => {
               textAlignVertical="top"
               autoFocus
             />
+
+            {/* Attached image previews */}
+            {images.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.imagePreviewRow}
+              >
+                {images.map((uri, imgIndex) => (
+                  <View key={imgIndex} style={styles.imagePreviewWrapper}>
+                    <Image source={{ uri }} style={styles.imagePreview} />
+                    <TouchableOpacity
+                      style={styles.removeImageButton}
+                      onPress={() => removeImage(uri)}
+                    >
+                      <Ionicons name="close-circle" size={22} color="#C85C5C" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            {/* Add photo button */}
+            <TouchableOpacity
+              style={styles.addImageButton}
+              onPress={handleAddImage}
+              disabled={isPickingImage}
+            >
+              {isPickingImage ? (
+                <ActivityIndicator size="small" color="#6B8E4E" />
+              ) : (
+                <>
+                  <Ionicons name="camera" size={20} color="#6B8E4E" />
+                  <Text style={styles.addImageText}>Add Photo</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Full-screen image viewer */}
+      <Modal
+        visible={!!viewerImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerImage(null)}
+      >
+        <TouchableOpacity
+          style={styles.viewerOverlay}
+          activeOpacity={1}
+          onPress={() => setViewerImage(null)}
+        >
+          {viewerImage && (
+            <Image source={{ uri: viewerImage }} style={styles.viewerImage} resizeMode="contain" />
+          )}
+          <TouchableOpacity
+            style={styles.viewerCloseButton}
+            onPress={() => setViewerImage(null)}
+          >
+            <Ionicons name="close-circle" size={36} color="#fff" />
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   )
@@ -443,6 +626,17 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 12,
   },
+  thumbnailRow: {
+    marginBottom: 12,
+  },
+  thumbnail: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    marginRight: 8,
+    borderWidth: 2,
+    borderColor: '#EDE7F6',
+  },
   itemFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -566,5 +760,62 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+  },
+  imagePreviewRow: {
+    marginHorizontal: 16,
+    marginTop: -8,
+    marginBottom: 12,
+  },
+  imagePreviewWrapper: {
+    marginRight: 12,
+    position: 'relative',
+  },
+  imagePreview: {
+    width: 90,
+    height: 90,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#9CAF88',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+  },
+  addImageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 24,
+    paddingVertical: 14,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#9CAF88',
+    borderStyle: 'dashed',
+    backgroundColor: '#fff',
+  },
+  addImageText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#6B8E4E',
+  },
+  viewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewerImage: {
+    width: '100%',
+    height: '80%',
+  },
+  viewerCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 24,
   },
 });

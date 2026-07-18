@@ -1,7 +1,8 @@
-// app/hooks/useDiaryStorage.js
+// hooks/useDiaryStorage.js
 
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { deletePersistedImages } from '../utils/imageStorage';
 
 const STORAGE_KEYS = {
   SECTIONS: '@diary_sections',
@@ -131,7 +132,15 @@ export const useDiarySections = () => {
 
       await createBackup(STORAGE_KEYS.BACKUP_SECTIONS, newSections);
 
+      // Clean up any images belonging to entries in this section before wiping it
       const itemsKey = STORAGE_KEYS.ITEMS + sectionName;
+      const storedItems = await AsyncStorage.getItem(itemsKey);
+      if (storedItems) {
+        const parsedItems = JSON.parse(storedItems);
+        const allImages = parsedItems.flatMap((item) => item.images || []);
+        await deletePersistedImages(allImages);
+      }
+
       await AsyncStorage.removeItem(itemsKey);
     } catch (error) {
       console.error('Error deleting section:', error);
@@ -175,14 +184,14 @@ export const useDiarySections = () => {
     addSection,
     deleteSection,
     renameSection,
-    refreshSections,  // ← Export the refresh function
+    refreshSections,  // Export the refresh function
     isLoading
   };
 };
 
 /**
  * Hook for managing items within a specific diary section
- * NOW WITH REFRESH FUNCTION!
+ * NOW WITH IMAGE SUPPORT!
  */
 export const useDiaryItems = (sectionName) => {
   const [items, setItems] = useState([]);
@@ -231,11 +240,12 @@ export const useDiaryItems = (sectionName) => {
     }
   };
 
-  const addItem = async (text) => {
+  const addItem = async (text, images = []) => {
     try {
       const newItem = {
         id: Date.now(),
         text: text,
+        images: images,
         createdAt: new Date().toLocaleString(),
         lastModified: new Date().toLocaleString()
       };
@@ -252,12 +262,22 @@ export const useDiaryItems = (sectionName) => {
     }
   };
 
-  const updateItem = async (index, text) => {
+  const updateItem = async (index, text, images = []) => {
     try {
+      const previousImages = items[index]?.images || [];
+
+      // Any image that was attached before but isn't in the new list
+      // was removed by the user during this edit — clean it up from disk.
+      const removedImages = previousImages.filter((uri) => !images.includes(uri));
+      if (removedImages.length > 0) {
+        await deletePersistedImages(removedImages);
+      }
+
       const updatedItems = [...items];
       updatedItems[index] = {
         ...updatedItems[index],
         text: text,
+        images: images,
         lastModified: new Date().toLocaleString()
       };
       
@@ -272,9 +292,14 @@ export const useDiaryItems = (sectionName) => {
 
   const deleteItem = async (index) => {
     try {
+      const itemToDelete = items[index];
       const updatedItems = items.filter((_, i) => i !== index);
       setItems(updatedItems);
       await saveItems(updatedItems);
+
+      if (itemToDelete?.images?.length) {
+        await deletePersistedImages(itemToDelete.images);
+      }
     } catch (error) {
       console.error('Error deleting item:', error);
       setItems(items);
@@ -284,8 +309,12 @@ export const useDiaryItems = (sectionName) => {
 
   const clearAllItems = async () => {
     try {
+      const allImages = items.flatMap((item) => item.images || []);
       setItems([]);
       await saveItems([]);
+      if (allImages.length) {
+        await deletePersistedImages(allImages);
+      }
     } catch (error) {
       console.error('Error clearing items:', error);
       throw error;

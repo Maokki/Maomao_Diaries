@@ -25,7 +25,8 @@
       "package": "com.nagiiiqt.MaomaoDiaries",
       "permissions": [
         "ACCESS_NETWORK_STATE",
-        "INTERNET"
+        "INTERNET",
+        "CAMERA"
       ]
     },
     "web": {
@@ -49,6 +50,13 @@
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Maomao needs access to your gallery to attach photos to your diary.",
+          "cameraPermission": "Maomao needs camera access to take a photo for your diary."
         }
       ]
     ],
