@@ -7,7 +7,7 @@ import Sidebar from '../components/Sidebar';
 import BackupButton from '../components/BackupButton';
 import AISearch from '../components/AISearch';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useDiarySections } from './_hooks/useDiaryStorage';
+import { useDiarySections } from '../hooks/useDiaryStorage';
 import { getRandomQuote } from '../utils/maomaoQuotes';
 
 export default function Home() {
