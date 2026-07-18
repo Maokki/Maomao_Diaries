@@ -3,12 +3,12 @@ import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Animated } from '
 import { useRef, useEffect, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
-import Sidebar from './components/Sidebar';
-import BackupButton from './components/BackupButton';
-import AISearch from './components/AISearch';
+import Sidebar from '../components/Sidebar';
+import BackupButton from '../components/BackupButton';
+import AISearch from '../components/AISearch';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useDiarySections } from './hooks/useDiaryStorage';
-import { getRandomQuote } from './utils/maomaoQuotes';
+import { useDiarySections } from './_hooks/useDiaryStorage';
+import { getRandomQuote } from '../utils/maomaoQuotes';
 
 export default function Home() {
   const sidebarRefreshRef = useRef(null);
