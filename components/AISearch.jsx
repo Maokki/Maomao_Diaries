@@ -221,7 +221,7 @@ export default function AISearch({ sections = [] }) {
                 <View style={styles.emptyState}>
                   <View style={styles.emptyImageContainer}>
                   <Image
-                    source={require('../../assets/ok_mao.jpg')}
+                    source={require('../assets/ok_mao.jpg')}
                     style={{
                       width: 180,
                       height: 180,
@@ -258,7 +258,7 @@ export default function AISearch({ sections = [] }) {
                     {msg.role === 'ai' && (
                       <View style={styles.pfpWrapper}>
                         <Image 
-                          source={require('../../assets/maomao_icon-512.png')} 
+                          source={require('../assets/maomao_icon-512.png')} 
                           style={styles.aiAvatar} 
                           resizeMode="cover"
                         />

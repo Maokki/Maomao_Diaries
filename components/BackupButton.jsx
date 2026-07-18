@@ -106,7 +106,7 @@ const BackupButton = ({ onDataRefresh }) => {
                     </View>
                     <View style={styles.imageContainer}>
                       <Image 
-                        source={require('../../assets/jinshi_export.jpg')} 
+                        source={require('../assets/jinshi_export.jpg')} 
                         style={styles.decorativeImage} 
                         resizeMode="contain" 
                       />
