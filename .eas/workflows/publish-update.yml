@@ -1,9 +1,5 @@
 name: Publish Production Update
 
-on:
-  push:
-    branches: ['main']
-
 jobs:
   publish_update:
     name: Publish OTA Update to Production
