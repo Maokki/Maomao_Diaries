@@ -2,7 +2,6 @@
   "expo": {
     "name": "Maomao-Diaries",
     "slug": "Maomao-Diaries",
-    "scheme": "maomaodiaries",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/maomao_icon-192.png",
@@ -30,6 +29,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/19f78d82-ea9e-42bc-a93c-71df133a4e46"
     },
     "plugins": [
       "expo-router",
