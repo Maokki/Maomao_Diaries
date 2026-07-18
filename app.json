@@ -1,14 +1,15 @@
 {
   "expo": {
-    "name": "Maomao-Diaries",
+    "name": "Maomao Diaries",
     "slug": "Maomao-Diaries",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/maomao_icon-192.png",
+    "scheme": "maomaodiaries",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/maomao_icon-192.png",
+      "image": "./assets/maomao_icon-512.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,7 +18,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/maomao_icon-192.png",
+        "foregroundImage": "./assets/maomao_icon-512.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -49,8 +50,7 @@
             "backgroundColor": "#000000"
           }
         }
-      ],
-      "expo-sharing"
+      ]
     ],
     "extra": {
       "router": {},
