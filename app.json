@@ -7,11 +7,6 @@
     "icon": "./assets/maomao_icon-192.png",
     "scheme": "maomaodiaries",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/maomao_icon-192.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true
     },
