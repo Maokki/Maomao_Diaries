@@ -7,9 +7,8 @@
     "icon": "./assets/maomao_icon-192.png",
     "scheme": "maomaodiaries",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/maomao_icon-512.png",
+      "image": "./assets/maomao_icon-192.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -18,10 +17,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/maomao_icon-512.png",
+        "foregroundImage": "./assets/maomao_icon-192.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.nagiiiqt.MaomaoDiaries",
       "permissions": [
         "ACCESS_NETWORK_STATE",
@@ -58,7 +56,8 @@
           "photosPermission": "Maomao needs access to your gallery to attach photos to your diary.",
           "cameraPermission": "Maomao needs camera access to take a photo for your diary."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "extra": {
       "router": {},
