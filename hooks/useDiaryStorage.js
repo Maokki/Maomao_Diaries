@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Observe } from 'expo-observe';
 import { deletePersistedImages } from '../utils/imageStorage';
 
 const STORAGE_KEYS = {
@@ -114,6 +115,8 @@ export const useDiarySections = () => {
       );
 
       await createBackup(STORAGE_KEYS.BACKUP_SECTIONS, newSections);
+
+      Observe.logEvent('diary.section_created');
     } catch (error) {
       console.error('Error adding section:', error);
       setSections(sections);
@@ -135,13 +138,20 @@ export const useDiarySections = () => {
       // Clean up any images belonging to entries in this section before wiping it
       const itemsKey = STORAGE_KEYS.ITEMS + sectionName;
       const storedItems = await AsyncStorage.getItem(itemsKey);
+      let itemCount = 0;
       if (storedItems) {
         const parsedItems = JSON.parse(storedItems);
+        itemCount = parsedItems.length;
         const allImages = parsedItems.flatMap((item) => item.images || []);
         await deletePersistedImages(allImages);
       }
 
       await AsyncStorage.removeItem(itemsKey);
+
+      //custom event for analytics when a diary section is deleted
+      Observe.logEvent('diary.section_deleted', {
+        attributes: { itemCount },
+      });
     } catch (error) {
       console.error('Error deleting section:', error);
     }
@@ -184,15 +194,11 @@ export const useDiarySections = () => {
     addSection,
     deleteSection,
     renameSection,
-    refreshSections,  // Export the refresh function
+    refreshSections,  
     isLoading
   };
 };
 
-/**
- * Hook for managing items within a specific diary section
- * NOW WITH IMAGE SUPPORT!
- */
 export const useDiaryItems = (sectionName) => {
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -253,7 +259,17 @@ export const useDiaryItems = (sectionName) => {
       const newItems = [newItem, ...items];
       setItems(newItems);
       await saveItems(newItems);
-      
+
+
+      //custom event for analytics when a new diary entry is created
+      Observe.logEvent('diary.entry_created', {
+        attributes: {
+          section: sectionName,
+          hasImages: images.length > 0,
+          imageCount: images.length,
+        },
+      });
+
       return newItem;
     } catch (error) {
       console.error('Error adding item:', error);
@@ -283,6 +299,14 @@ export const useDiaryItems = (sectionName) => {
       
       setItems(updatedItems);
       await saveItems(updatedItems);
+
+      //custom event for analytics when a diary entry is updated
+      Observe.logEvent('diary.entry_updated', {
+        attributes: {
+          section: sectionName,
+          imageCount: images.length,
+        },
+      });
     } catch (error) {
       console.error('Error updating item:', error);
       setItems(items);
@@ -300,6 +324,10 @@ export const useDiaryItems = (sectionName) => {
       if (itemToDelete?.images?.length) {
         await deletePersistedImages(itemToDelete.images);
       }
+
+      Observe.logEvent('diary.entry_deleted', {
+        attributes: { section: sectionName },
+      });
     } catch (error) {
       console.error('Error deleting item:', error);
       setItems(items);

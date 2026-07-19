@@ -13,10 +13,11 @@ import {
   Alert,
   Image
 } from 'react-native'
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import * as ImagePicker from 'expo-image-picker'
+import { useObserve } from 'expo-observe'
 import { useDiaryItems } from '../../hooks/useDiaryStorage';
 import { persistPickedImage, deletePersistedImage } from '../../utils/imageStorage';
 
@@ -110,6 +111,14 @@ const DiarySections = () => {
   const router = useRouter();
   
   const { items, addItem, updateItem, deleteItem, isLoading } = useDiaryItems(section);
+  const { markInteractive } = useObserve();
+
+  // mark the screen as interactive once the diary items have finished loading
+  useEffect(() => {
+    if (!isLoading) {
+      markInteractive();
+    }
+  }, [isLoading, markInteractive]);
   
   const [expandedItems, setExpandedItems] = useState({});
   const [isModalVisible, setIsModalVisible] = useState(false);

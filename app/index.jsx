@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Animated } from '
 import { useRef, useEffect, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
+import { useObserve } from 'expo-observe';
 import Sidebar from '../components/Sidebar';
 import BackupButton from '../components/BackupButton';
 import AISearch from '../components/AISearch';
@@ -16,7 +17,8 @@ export default function Home() {
   const [totalItems, setTotalItems] = useState(0);
   const [greeting, setGreeting] = useState('');
   const [currentQuote, setCurrentQuote] = useState({ text: '', context: '' });
-  
+  const { markInteractive } = useObserve();
+
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -64,7 +66,9 @@ export default function Home() {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+
+    markInteractive();
+  }, [markInteractive]);
 
   const handleDataRefresh = async () => {
     console.log('🔄 Refreshing data after import...');

@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
+import { Observe } from 'expo-observe';
 import { Alert } from 'react-native';
 
 const STORAGE_KEYS = {
@@ -41,9 +42,20 @@ export const useBackupManager = (onDataChanged) => {  // ← add callback parame
         [{ text: 'OK' }]
       );
 
+      Observe.logEvent('backup.exported', {
+        attributes: {
+          sections: backupData.sections.length,
+          totalItems: backupData.totalItems,
+        },
+      });
+
       return { success: true, filename };
     } catch (error) {
       console.error('Export backup error:', error);
+      Observe.logEvent('backup.export_failed', {
+        severity: 'error',
+        attributes: { reason: error?.message ?? 'unknown' },
+      });
       Alert.alert(
         'Backup Failed',
         'Could not create backup. Please try again.',
@@ -116,9 +128,21 @@ export const useBackupManager = (onDataChanged) => {  // ← add callback parame
         [{ text: 'OK' }]
       );
 
+      Observe.logEvent('backup.restored', {
+        attributes: {
+          mode: replaceExisting ? 'replace' : 'merge',
+          sections: backupData.sections.length,
+          totalItems: backupData.totalItems,
+        },
+      });
+
       return { success: true };
     } catch (error) {
       console.error('Import backup error:', error);
+      Observe.logEvent('backup.restore_failed', {
+        severity: 'error',
+        attributes: { reason: error?.message ?? 'unknown' },
+      });
       Alert.alert(
         'Restore Failed',
         'Could not restore backup. The file may be corrupted or invalid.',
