@@ -3,17 +3,19 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import * as NavigationBar from 'expo-navigation-bar';
-import { AppMetrics, AppMetricsRoot } from 'expo-observe';
+import { ObserveRoot, useObserve } from 'expo-observe';
 import UpdateBar from '../components/UpdateBar';
 
 function RootLayout() {
+  const { markInteractive } = useObserve();
+
   useEffect(() => {
     if (Platform.OS === 'android') {
       NavigationBar.setVisibilityAsync('hidden');
     }
-
-    AppMetrics.markInteractive();
-  }, []);
+    
+    markInteractive();
+  }, [markInteractive]);
 
   return (
     <>
@@ -24,4 +26,4 @@ function RootLayout() {
   );
 }
 
-export default AppMetricsRoot.wrap(RootLayout);
+export default ObserveRoot.wrap(RootLayout);
